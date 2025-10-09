@@ -1,0 +1,36 @@
+.main {
+  padding: 2rem;
+}
+
+.table-container {
+  background: #1e1e1e;
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 1rem;
+  border-bottom: 1px solid #444;
+  text-align: left;
+}
+
+th {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+
+.present {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
