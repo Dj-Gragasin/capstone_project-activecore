@@ -13,9 +13,13 @@ import {
   IonBackButton,
   IonIcon,
   IonSelect,
-  IonSelectOption
+  IonSelectOption,
 } from '@ionic/react';
-import { Line, Bar } from 'react-chartjs-2';
+import {
+  barbell,
+  analytics,
+  calendar,
+} from 'ionicons/icons';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,9 +29,10 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartOptions,
 } from 'chart.js';
-import { calendar, analytics, barbell } from 'ionicons/icons';
+import { Line, Bar } from 'react-chartjs-2';
 import './MuscleGainTracker.css';
 
 ChartJS.register(
@@ -151,7 +156,7 @@ const MuscleGainTracker: React.FC = () => {
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete all records? This cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete all records?')) {
       setRecords([]);
       localStorage.removeItem('muscleGainRecords');
       clearForm();
@@ -165,19 +170,22 @@ const MuscleGainTracker: React.FC = () => {
         label: 'Chest (cm)',
         data: records.map(r => r.measurements.chest),
         borderColor: '#FF6B6B',
-        tension: 0.1
+        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+        tension: 0.4
       },
       {
         label: 'Arms (cm)',
         data: records.map(r => r.measurements.arms),
         borderColor: '#4ECDC4',
-        tension: 0.1
+        backgroundColor: 'rgba(78, 205, 196, 0.1)',
+        tension: 0.4
       },
       {
         label: 'Shoulders (cm)',
         data: records.map(r => r.measurements.shoulders),
         borderColor: '#45B7D1',
-        tension: 0.1
+        backgroundColor: 'rgba(69, 183, 209, 0.1)',
+        tension: 0.4
       }
     ]
   };
@@ -203,7 +211,7 @@ const MuscleGainTracker: React.FC = () => {
     ]
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'line' | 'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
@@ -227,7 +235,7 @@ const MuscleGainTracker: React.FC = () => {
     },
     plugins: {
       legend: {
-        position: 'top' as const,
+        position: 'top',
         labels: {
           color: '#ffffff'
         }
@@ -255,167 +263,150 @@ const MuscleGainTracker: React.FC = () => {
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <div className="progress-page-bg">
-          <div className="form-container">
-            {/* Measurements Section */}
-            <div className="form-section">
-              <div className="form-section-title">
-                <IonIcon icon={barbell} />
-                <span>Body Measurements</span>
-              </div>
-              <div className="form-section-description">
-                Track your body measurements in centimeters
-              </div>
-              <IonItem>
-                <IonLabel position="stacked">Date</IonLabel>
-                <IonInput 
-                  type="date"
-                  value={date}
-                  onIonChange={e => setDate(e.detail.value!)}
-                />
-              </IonItem>
-              {Object.entries(measurements).map(([key, value]) => (
-                <IonItem key={key}>
-                  <IonLabel position="stacked">{key.charAt(0).toUpperCase() + key.slice(1)} (cm)</IonLabel>
-                  <IonInput
-                    type="number"
-                    value={value}
-                    onIonChange={e => setMeasurements(prev => ({
-                      ...prev,
-                      [key]: e.detail.value!
-                    }))}
-                    placeholder={`Enter ${key} measurement`}
-                  />
-                </IonItem>
-              ))}
+        <div className="form-container">
+          <div className="form-section">
+            <div className="form-section-title">
+              <IonIcon icon={barbell} />
+              <span>Body Measurements</span>
             </div>
-
-            {/* Strength Stats Section */}
-            <div className="form-section">
-              <div className="form-section-title">
-                <IonIcon icon={analytics} />
-                <span>Strength Stats</span>
-              </div>
-              <div className="form-section-description">
-                Record your lifting achievements in kilograms
-              </div>
-              {Object.entries(strengthStats).map(([key, value]) => (
-                <IonItem key={key}>
-                  <IonLabel position="stacked">
-                    {key.replace(/([A-Z])/g, ' $1').trim()} (kg)
-                  </IonLabel>
-                  <IonInput
-                    type="number"
-                    value={value}
-                    onIonChange={e => setStrengthStats(prev => ({
-                      ...prev,
-                      [key]: e.detail.value!
-                    }))}
-                    placeholder={`Enter ${key.replace(/([A-Z])/g, ' $1').trim()} weight`}
-                  />
-                </IonItem>
-              ))}
-              <IonItem>
-                <IonLabel position="stacked">Protein Intake (g)</IonLabel>
+            <div className="form-section-description">
+              Track your body measurements in centimeters
+            </div>
+            <IonItem>
+              <IonLabel position="stacked">Date</IonLabel>
+              <IonInput 
+                type="date"
+                value={date}
+                onIonChange={e => setDate(e.detail.value!)}
+              />
+            </IonItem>
+            {Object.entries(measurements).map(([key, value]) => (
+              <IonItem key={key}>
+                <IonLabel position="stacked">{key.charAt(0).toUpperCase() + key.slice(1)} (cm)</IonLabel>
                 <IonInput
                   type="number"
-                  value={proteinIntake}
-                  onIonChange={e => setProteinIntake(e.detail.value!)}
-                  placeholder="Enter daily protein intake"
+                  value={value}
+                  onIonChange={e => setMeasurements(prev => ({
+                    ...prev,
+                    [key]: e.detail.value!
+                  }))}
+                  placeholder={`Enter ${key} measurement`}
                 />
               </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Notes</IonLabel>
+            ))}
+          </div>
+
+          <div className="form-section">
+            <div className="form-section-title">
+              <IonIcon icon={analytics} />
+              <span>Strength Stats</span>
+            </div>
+            <div className="form-section-description">
+              Record your lifting achievements in kilograms
+            </div>
+            {Object.entries(strengthStats).map(([key, value]) => (
+              <IonItem key={key}>
+                <IonLabel position="stacked">
+                  {key.replace(/([A-Z])/g, ' $1').trim()} (kg)
+                </IonLabel>
                 <IonInput
-                  value={notes}
-                  onIonChange={e => setNotes(e.detail.value!)}
-                  placeholder="Add any notes about your progress"
+                  type="number"
+                  value={value}
+                  onIonChange={e => setStrengthStats(prev => ({
+                    ...prev,
+                    [key]: e.detail.value!
+                  }))}
+                  placeholder={`Enter ${key}`}
                 />
               </IonItem>
-            </div>
+            ))}
+            <IonItem>
+              <IonLabel position="stacked">Daily Protein Intake (g)</IonLabel>
+              <IonInput
+                type="number"
+                value={proteinIntake}
+                onIonChange={e => setProteinIntake(e.detail.value!)}
+                placeholder="Enter daily protein intake"
+              />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Notes</IonLabel>
+              <IonInput
+                value={notes}
+                onIonChange={e => setNotes(e.detail.value!)}
+                placeholder="Add any notes"
+              />
+            </IonItem>
           </div>
-
-          <div className="button-container">
-            <IonButton 
-              onClick={clearForm} 
-              fill="outline" 
-              className="ion-margin-end"
-            >
-              Clear Form
-            </IonButton>
-            <IonButton 
-              onClick={handleUpdate}
-              className="ion-margin-end"
-            >
-              Update Progress
-            </IonButton>
-            <IonButton 
-              onClick={handleDeleteAll}
-              color="danger" 
-              fill="outline"
-            >
-              Delete All Progress
-            </IonButton>
-          </div>
-
-          {records.length > 0 && (
-            <div className="charts-container">
-              <div className="chart-controls">
-                <IonSelect
-                  value={selectedChart}
-                  onIonChange={e => setSelectedChart(e.detail.value)}
-                  interface="popover"
-                >
-                  <IonSelectOption value="measurements">Measurements Progress</IonSelectOption>
-                  <IonSelectOption value="strength">Strength Progress</IonSelectOption>
-                </IonSelect>
-              </div>
-              
-              <div className="chart-container">
-                {selectedChart === 'measurements' ? (
-                  <Line data={measurementsChartData} options={chartOptions} />
-                ) : (
-                  <Bar data={strengthChartData} options={chartOptions} />
-                )}
-              </div>
-            </div>
-          )}
-
-          {records.length > 0 && (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Measurements (cm)</th>
-                    <th>Strength (kg)</th>
-                    <th>Protein (g)</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((record, index) => (
-                    <tr key={index}>
-                      <td>{record.date}</td>
-                      <td>
-                        Chest: {record.measurements.chest}, 
-                        Arms: {record.measurements.arms}, 
-                        Shoulders: {record.measurements.shoulders}
-                      </td>
-                      <td>
-                        BP: {record.strengthStats.benchPress}, 
-                        DL: {record.strengthStats.deadlift}, 
-                        SQ: {record.strengthStats.squat}
-                      </td>
-                      <td>{record.proteinIntake}</td>
-                      <td>{record.notes}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        <div className="button-container">
+          <IonButton 
+            onClick={clearForm} 
+            fill="outline"
+          >
+            Clear Form
+          </IonButton>
+          <IonButton onClick={handleUpdate}>
+            Update Progress
+          </IonButton>
+          <IonButton 
+            onClick={handleDeleteAll}
+            color="danger" 
+            fill="outline"
+          >
+            Delete All
+          </IonButton>
+        </div>
+
+        {records.length > 0 && (
+          <div className="charts-container">
+            <div className="chart-controls">
+              <IonSelect
+                value={selectedChart}
+                onIonChange={(e) => setSelectedChart(e.detail.value)}
+              >
+                <IonSelectOption value="measurements">Measurements</IonSelectOption>
+                <IonSelectOption value="strength">Strength</IonSelectOption>
+              </IonSelect>
+            </div>
+            
+            <div className="chart-container">
+              {selectedChart === 'measurements' ? (
+                <Line data={measurementsChartData} options={chartOptions as ChartOptions<'line'>} />
+              ) : (
+                <Bar data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {records.length > 0 && (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Chest</th>
+                  <th>Arms</th>
+                  <th>Bench Press</th>
+                  <th>Protein</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((record, index) => (
+                  <tr key={index}>
+                    <td>{record.date}</td>
+                    <td>{record.measurements.chest} cm</td>
+                    <td>{record.measurements.arms} cm</td>
+                    <td>{record.strengthStats.benchPress} kg</td>
+                    <td>{record.proteinIntake} g</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </IonContent>
     </IonPage>
   );

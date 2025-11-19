@@ -1,5 +1,3 @@
-CREATE DATABASE activecore;
-
 export interface User {
     id?: number;
     email: string;

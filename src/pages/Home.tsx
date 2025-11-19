@@ -1,117 +1,75 @@
-import React, { useState } from "react";
+// src/pages/Home.tsx
+import { useState } from 'react';
 import {
+  IonContent,
   IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
-  IonContent,
-  IonButtons,
   IonButton,
   IonIcon,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
   IonModal,
-  IonInput,
   IonItem,
   IonLabel,
+  IonInput,
+  IonButtons,
   useIonRouter
-} from "@ionic/react";
-
-import {
-  home,
-  star,
-  logIn,
-  informationCircle,
-  playCircle,
-  trophyOutline
-} from "ionicons/icons";
-import "./Home.css";
+} from '@ionic/react';
+import { logIn, informationCircle } from 'ionicons/icons';
+import { loginUser } from '../services/auth.service';
+import './Home.css';
 
 const Home: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showLogin, setShowLogin] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [showLearnMore, setShowLearnMore] = useState(false);
+  const [error, setError] = useState('');
   const router = useIonRouter();
 
-  const handleLogin = () => {
-    // ✅ Test login credentials
-    if (email === "test@test.com" && password === "12345") {
-      // Store user info in localStorage
-      const user = { fullName: "John Doe", email };
-      localStorage.setItem("currentUser", JSON.stringify(user));
-
-      // ✅ Redirect to correct route in App.tsx
-      router.push("/member", "root", "replace");
-
+  const handleLogin = async () => {
+    try {
+      setError('');
+      const result = await loginUser(email, password);
+      if (result.user.role === 'admin') {
+        router.push('/admin', 'root', 'replace');
+      } else {
+        router.push('/member', 'root', 'replace');
+      }
       setShowLogin(false);
-    } else {
-      alert(
-        "❌ Invalid email or password.\n\nUse:\nEmail: test@test.com\nPassword: 12345"
-      );
+    } catch (error: any) {
+      setError(error.message);
+      console.error('Login error:', error);
     }
   };
 
   return (
-    <IonPage>
-      {/* Header */}
-      <IonHeader className="ion-no-border">
-        <IonToolbar color="dark">
-          <IonTitle>
-            <span style={{ fontSize: "1.4rem" }}>🏋️ ActiveCore</span>
-          </IonTitle>
-          <IonButtons slot="end">
-            <IonButton fill="clear" routerLink="/home">
-              <IonIcon icon={home} />
-            </IonButton>
-            <IonButton fill="clear" routerLink="/features">
-              <IonIcon icon={star} />
-            </IonButton>
-          </IonButtons>
+    <IonPage className="home-page">
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>🏋️ ActiveCore</IonTitle>
         </IonToolbar>
       </IonHeader>
 
-      {/* Main Content */}
-      <IonContent className="ion-padding">
-        {/* Hero Section */}
-        <div className="hero">
-          <h1>Transform Your Life Today</h1>
+      <IonContent fullscreen>
+        <div className="hero-section">
+          <h1>Welcome to ActiveCore</h1>
           <p>
-            Join ActiveCore and experience a new way of fitness tracking,
-            personalized training, and community support. Start your journey
-            to a healthier, stronger you.
+            <strong>ActiveCore</strong> is your all-in-one fitness companion. Track your progress, manage your gym attendance, access personalized meal plans, and unlock rewards as you achieve your goals. Join our community and transform your fitness journey today!
           </p>
           <div className="cta-buttons">
-            <IonButton
-              expand="block"
-              color="primary"
-              routerLink="/payment"
+            <IonButton 
+              className="secondary-button"
+              fill="outline" 
               size="large"
-            >
-              <IonIcon icon={playCircle} slot="start" />
-              Start Your Journey
-            </IonButton>
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="primary"
-              routerLink="/features"
-              size="large"
+              onClick={() => setShowLearnMore(true)}
             >
               <IonIcon icon={informationCircle} slot="start" />
               Learn More
             </IonButton>
-
-            {/* ✅ Login Button */}
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="primary"
-              size="large"
+            <IonButton 
+              className="login-button"
+              fill="clear"
               onClick={() => setShowLogin(true)}
             >
               <IonIcon icon={logIn} slot="start" />
@@ -120,166 +78,122 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Section */}
-        <IonGrid className="stats-grid">
-          <IonRow className="ion-justify-content-center">
-            <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard button>
-                <IonCardHeader>
-                  <IonCardTitle>5,000+</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <strong>Active Members</strong>
-                  <br />
-                  <small>Growing daily</small>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-            <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard button>
-                <IonCardHeader>
-                  <IonCardTitle>500+</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <strong>Classes Weekly</strong>
-                  <br />
-                  <small>Various disciplines</small>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-            <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard button>
-                <IonCardHeader>
-                  <IonCardTitle>50+</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <strong>Expert Trainers</strong>
-                  <br />
-                  <small>Certified professionals</small>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-            <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard button>
-                <IonCardHeader>
-                  <IonCardTitle>95%</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <strong>Success Rate</strong>
-                  <br />
-                  <small>Member satisfaction</small>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
-
-        {/* Features Section */}
-        <div style={{ margin: "3rem 0" }}>
-          <h2
-            style={{
-              textAlign: "center",
-              marginBottom: "2rem",
-              color: "var(--primary-color)"
-            }}
-          >
-            Why Choose ActiveCore?
-          </h2>
-          <IonGrid>
-            <IonRow>
-              <IonCol size="12" sizeMd="4">
-                <div style={{ textAlign: "center", padding: "1rem" }}>
-                  <IonIcon
-                    icon={trophyOutline}
-                    style={{ fontSize: "3rem", color: "var(--primary-color)" }}
-                  />
-                  <h3>Proven Results</h3>
-                  <p style={{ color: "var(--text-secondary)" }}>
-                    Our members achieve their fitness goals 95% of the time
-                  </p>
-                </div>
-              </IonCol>
-              <IonCol size="12" sizeMd="4">
-                <div style={{ textAlign: "center", padding: "1rem" }}>
-                  <IonIcon
-                    icon={star}
-                    style={{ fontSize: "3rem", color: "var(--primary-color)" }}
-                  />
-                  <h3>Expert Guidance</h3>
-                  <p style={{ color: "var(--text-secondary)" }}>
-                    Work with certified trainers and nutrition specialists
-                  </p>
-                </div>
-              </IonCol>
-              <IonCol size="12" sizeMd="4">
-                <div style={{ textAlign: "center", padding: "1rem" }}>
-                  <IonIcon
-                    icon={home}
-                    style={{ fontSize: "3rem", color: "var(--primary-color)" }}
-                  />
-                  <h3>Flexible Training</h3>
-                  <p style={{ color: "var(--text-secondary)" }}>
-                    Train at home, in the gym, or anywhere you prefer
-                  </p>
-                </div>
-              </IonCol>
-            </IonRow>
-          </IonGrid>
+        <div className="stats-section">
+          <div className="stat-card">
+            <h2>5,000+</h2>
+            <p>Active Members</p>
+            <span>Growing daily</span>
+          </div>
+          <div className="stat-card">
+            <h2>500+</h2>
+            <p>Classes Weekly</p>
+            <span>Various disciplines</span>
+          </div>
+          <div className="stat-card">
+            <h2>50+</h2>
+            <p>Expert Trainers</p>
+            <span>Certified professionals</span>
+          </div>
+          <div className="stat-card">
+            <h2>95%</h2>
+            <p>Success Rate</p>
+            <span>Member satisfaction</span>
+          </div>
         </div>
 
-        {/* Footer */}
-        <footer>
-          <p>&copy; 2025 ActiveCore. All rights reserved.</p>
-          <p style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
-            Transform your fitness journey with us
-          </p>
-        </footer>
-      </IonContent>
-
-      {/* 🔑 Login Modal */}
-      <IonModal
-        isOpen={showLogin}
-        onDidDismiss={() => setShowLogin(false)}
-        className="centered-modal"
-        presentingElement={undefined}
-      >
-        <IonContent>
-          <div className="login-modal-content">
-            <h2 className="login-title">Login</h2>
-            <IonItem>
-              <IonLabel position="stacked">Email</IonLabel>
-              <IonInput
-                type="email"
-                value={email}
-                placeholder="Enter your email"
-                onIonInput={(e) => setEmail(e.detail.value!)}
-              />
-            </IonItem>
-
-            <IonItem>
-              <IonLabel position="stacked">Password</IonLabel>
-              <IonInput
-                type="password"
-                value={password}
-                placeholder="Enter your password"
-                onIonInput={(e) => setPassword(e.detail.value!)}
-              />
-            </IonItem>
-
-            <IonButton expand="block" className="login-btn" onClick={handleLogin}>
-              Log In
-            </IonButton>
-            <IonButton
-              expand="block"
-              fill="clear"
-              className="cancel-btn"
-              onClick={() => setShowLogin(false)}
-            >
-              Cancel
-            </IonButton>
+        <div className="features-section">
+          <h2>Why Choose ActiveCore?</h2>
+          <div className="features-grid">
+            <div className="feature-card">
+              <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&auto=format" alt="Gym Equipment" />
+              <h3>State-of-the-art Equipment</h3>
+              <p>Access to premium fitness equipment</p>
+            </div>
+            <div className="feature-card">
+              <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=500&auto=format" alt="Personal Training" />
+              <h3>Expert Training</h3>
+              <p>Work with certified trainers</p>
+            </div>
+            <div className="feature-card">
+              <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=500&auto=format" alt="Gym Facilities" />
+              <h3>Modern Facilities</h3>
+              <p>Clean and spacious environment</p>
+            </div>
           </div>
-        </IonContent>
-      </IonModal>
+        </div>
+
+        {/* Learn More Modal */}
+        <IonModal isOpen={showLearnMore} onDidDismiss={() => setShowLearnMore(false)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>About ActiveCore</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowLearnMore(false)}>Close</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <h2 style={{ color: '#00e676', marginTop: '1rem' }}>What is ActiveCore?</h2>
+            <p>
+              <strong>ActiveCore</strong> is a modern gym management and fitness tracking platform designed to help you achieve your health and wellness goals. With ActiveCore, you can:
+            </p>
+            <ul>
+              <li>Track your gym attendance and progress</li>
+              <li>Access personalized meal and workout plans</li>
+              <li>Earn rewards for consistent attendance</li>
+              <li>Connect with expert trainers and a supportive community</li>
+              <li>Monitor your achievements and stay motivated</li>
+            </ul>
+            <p>
+              Whether you're a beginner or a fitness enthusiast, ActiveCore provides the tools and support you need to succeed. Join us and start your transformation today!
+            </p>
+          </IonContent>
+        </IonModal>
+
+        {/* Login Modal */}
+        <IonModal isOpen={showLogin} onDidDismiss={() => setShowLogin(false)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Login</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowLogin(false)}>Close</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <div className="login-form">
+              {error && (
+                <IonItem color="danger" lines="none">
+                  <IonLabel>{error}</IonLabel>
+                </IonItem>
+              )}
+              <IonItem>
+                <IonLabel position="stacked">Email</IonLabel>
+                <IonInput
+                  type="email"
+                  value={email}
+                  onIonChange={e => setEmail(e.detail.value || '')}
+                  placeholder="Enter your email"
+                />
+              </IonItem>
+              <IonItem>
+                <IonLabel position="stacked">Password</IonLabel>
+                <IonInput
+                  type="password"
+                  value={password}
+                  onIonChange={e => setPassword(e.detail.value || '')}
+                  placeholder="Enter your password"
+                />
+              </IonItem>
+              <div className="ion-padding-top">
+                <IonButton expand="block" onClick={handleLogin}>
+                  Log In
+                </IonButton>
+              </div>
+            </div>
+          </IonContent>
+        </IonModal>
+      </IonContent>
     </IonPage>
   );
 };

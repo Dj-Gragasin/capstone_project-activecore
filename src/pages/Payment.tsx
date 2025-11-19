@@ -198,6 +198,21 @@ const Payment: React.FC = () => {
     }
   };
 
+  async function payWithGcash(amount: number, plan: string) {
+    const token = localStorage.getItem('token') || '';
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002/api'}/payments/paymongo/create-source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ amount, plan })
+    });
+    const json = await res.json();
+    if (res.ok && json.checkoutUrl) {
+      window.location.href = json.checkoutUrl;
+    } else {
+      throw new Error(json.message || 'Failed to create PayMongo source');
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -222,6 +237,12 @@ const Payment: React.FC = () => {
       if (checkResult.exists) {
         setErrors(prev => ({ ...prev, email: 'This email is already registered' }));
         setLoading(false);
+        return;
+      }
+
+      if (formData.paymentMethod === 'gcash') {
+        // For GCash payments
+        await payWithGcash(planPrices[formData.plan as keyof typeof planPrices], formData.plan);
         return;
       }
 

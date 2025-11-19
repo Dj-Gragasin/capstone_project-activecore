@@ -5,19 +5,14 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonCard,
-  IonCardContent,
   IonItem,
   IonLabel,
   IonInput,
   IonButton,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonButtons,
-  IonBackButton
+  IonBackButton,
+  IonIcon,
 } from '@ionic/react';
-import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,12 +21,13 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartData,
+  ChartOptions,
 } from 'chart.js';
-import type { ChartData, ChartOptions } from 'chart.js';
-import './ProgressTracker.css';
+import { Line } from 'react-chartjs-2';
 import { calendar, analytics } from 'ionicons/icons';
-import { IonIcon } from '@ionic/react';
+import './ProgressTracker.css';
 
 ChartJS.register(
   CategoryScale,
@@ -94,7 +90,7 @@ const ProgressTracker: React.FC = () => {
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete all progress records? This cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete all records?')) {
       setRecords([]);
       localStorage.removeItem('progressRecords');
       clearForm();
@@ -116,14 +112,16 @@ const ProgressTracker: React.FC = () => {
         label: 'Weight (kg)',
         data: records.map(r => r.weight),
         borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
+        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+        tension: 0.4,
         yAxisID: 'y'
       },
       {
         label: 'BMI',
         data: records.map(r => r.bmi),
         borderColor: 'rgb(255, 99, 132)',
-        tension: 0.1,
+        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+        tension: 0.4,
         yAxisID: 'y1'
       }
     ]
@@ -224,129 +222,109 @@ const ProgressTracker: React.FC = () => {
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <div className="progress-page-bg">
-          <div className="decorative-line"></div>
-          <div className="form-container">
-            <div className="form-section">
-              <div className="form-section-title">
-                <IonIcon icon={calendar} />
-                <span>Date & Weight Details</span>
-              </div>
-              <div className="form-section-description">
-                Track your progress by recording your current date and weight measurements.
-              </div>
-              <IonItem>
-                <IonLabel position="stacked">Date</IonLabel>
-                <IonInput 
-                  type="date"
-                  value={date}
-                  onIonChange={e => setDate(e.detail.value!)}
-                />
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Weight (kg)</IonLabel>
-                <IonInput
-                  type="number"
-                  value={weight}
-                  onIonChange={e => setWeight(e.detail.value!)}
-                  placeholder="Enter your current weight"
-                />
-              </IonItem>
+        <div className="form-container">
+          <div className="form-section">
+            <div className="form-section-title">
+              <IonIcon icon={calendar} />
+              <span>Date & Weight Details</span>
             </div>
-
-            <div className="form-section">
-              <div className="form-section-title">
-                <IonIcon icon={analytics} />
-                <span>BMI & Notes</span>
-              </div>
-              <div className="form-section-description">
-                Calculate your BMI and add any relevant notes about your fitness journey.
-              </div>
-              <IonItem>
-                <IonLabel position="stacked">BMI</IonLabel>
-                <IonInput
-                  type="number"
-                  value={bmi}
-                  onIonChange={e => setBmi(e.detail.value!)}
-                  placeholder="Enter your BMI"
-                />
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Notes</IonLabel>
-                <IonInput
-                  value={notes}
-                  onIonChange={e => setNotes(e.detail.value!)}
-                  placeholder="Add any notes about your progress"
-                />
-              </IonItem>
-            </div>
-
-            <div className="button-container">
-              <IonButton 
-                onClick={clearForm} 
-                fill="outline" 
-                className="ion-margin-end"
-              >
-                Clear Form
-              </IonButton>
-              <IonButton 
-                onClick={handleUpdate}
-                className="ion-margin-end"
-              >
-                Update Progress
-              </IonButton>
-              <IonButton 
-                onClick={handleDeleteAll}
-                color="danger" 
-                fill="outline"
-              >
-                Delete All Progress
-              </IonButton>
-            </div>
+            <IonItem>
+              <IonLabel position="stacked">Date</IonLabel>
+              <IonInput 
+                type="date"
+                value={date}
+                onIonChange={e => setDate(e.detail.value!)}
+              />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Weight (kg)</IonLabel>
+              <IonInput
+                type="number"
+                value={weight}
+                onIonChange={e => setWeight(e.detail.value!)}
+                placeholder="Enter your weight"
+              />
+            </IonItem>
           </div>
 
-          <div className="chart-container">
-            {records.length > 0 && (
-              <Line data={chartData} options={chartOptions} />
-            )}
-          </div>
-
-          {records.length > 0 && (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Weight (kg)</th>
-                    <th>BMI</th>
-                    <th>Notes</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((record, index) => (
-                    <tr key={index}>
-                      <td>{record.date}</td>
-                      <td>{record.weight}</td>
-                      <td>{record.bmi}</td>
-                      <td>{record.notes}</td>
-                      <td>
-                        <IonButton
-                          fill="clear"
-                          color="danger"
-                          size="small"
-                          onClick={() => handleDeleteRecord(index)}
-                        >
-                          Delete
-                        </IonButton>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="form-section">
+            <div className="form-section-title">
+              <IonIcon icon={analytics} />
+              <span>BMI & Notes</span>
             </div>
-          )}
+            <IonItem>
+              <IonLabel position="stacked">BMI</IonLabel>
+              <IonInput
+                type="number"
+                value={bmi}
+                onIonChange={e => setBmi(e.detail.value!)}
+                placeholder="Enter your BMI"
+              />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Notes</IonLabel>
+              <IonInput
+                value={notes}
+                onIonChange={e => setNotes(e.detail.value!)}
+                placeholder="Add notes"
+              />
+            </IonItem>
+          </div>
         </div>
+
+        <div className="button-container">
+          <IonButton onClick={clearForm} fill="outline">
+            Clear Form
+          </IonButton>
+          <IonButton onClick={handleUpdate}>
+            Update Progress
+          </IonButton>
+          <IonButton onClick={handleDeleteAll} color="danger" fill="outline">
+            Delete All
+          </IonButton>
+        </div>
+
+        {records.length > 0 && (
+          <div className="chart-container">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+        )}
+
+        {records.length > 0 && (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Weight (kg)</th>
+                  <th>BMI</th>
+                  <th>Notes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((record, index) => (
+                  <tr key={index}>
+                    <td>{record.date}</td>
+                    <td>{record.weight}</td>
+                    <td>{record.bmi}</td>
+                    <td>{record.notes}</td>
+                    <td>
+                      <IonButton
+                        fill="clear"
+                        color="danger"
+                        size="small"
+                        onClick={() => handleDeleteRecord(index)}
+                      >
+                        Delete
+                      </IonButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </IonContent>
     </IonPage>
   );

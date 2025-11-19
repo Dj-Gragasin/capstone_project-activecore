@@ -6,85 +6,96 @@ import {
   IonTitle,
   IonContent,
   IonButton,
+  IonIcon,
+  IonButtons,
   useIonRouter,
-  IonIcon
 } from "@ionic/react";
-import { barbell } from 'ionicons/icons';
+import {
+  home,
+  qrCode,
+  calendarOutline,
+  calculator,
+  restaurant,
+  trendingUp,
+  barbell,
+  logOut,
+  card,
+  calendar,
+  flame,
+} from "ionicons/icons";
 import "./MemberDashboard.css";
+
+const API_URL = 'http://localhost:3002/api';
 
 const MemberDashboard: React.FC = () => {
   const [memberName, setMemberName] = useState("John Doe");
   const [firstName, setFirstName] = useState("John");
+  const [streak, setStreak] = useState<number>(0); // added
+  const [motivation, setMotivation] = useState<string>(''); // added
   const router = useIonRouter();
 
   useEffect(() => {
-    const currentUser = localStorage.getItem("currentUser");
-    if (currentUser) {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
       try {
-        const parsedUser = JSON.parse(currentUser);
-        setMemberName(parsedUser.fullName);
-        setFirstName(parsedUser.fullName.split(" ")[0]);
+        const user = JSON.parse(userStr);
+        const fullName = `${user.firstName} ${user.lastName}`;
+        setMemberName(fullName);
+        setFirstName(user.firstName);
       } catch (err) {
         console.error("Invalid user data in localStorage");
       }
     } else {
-      // ✅ If no user is found, redirect back to home
       router.push("/home", "root", "replace");
     }
+
+    // Load streak and daily motivation
+    loadStreakAndMotivation();
   }, [router]);
 
+  // new helper to fetch attendance stats and pick daily motivation
+  const loadStreakAndMotivation = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/attendance/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.stats) {
+          setStreak(data.stats.currentStreak || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load attendance stats:', err);
+    } finally {
+      // Daily motivations list
+      const motivations = [
+        "One step at a time — your progress matters.",
+        "Show up today. Your future self will thank you.",
+        "Consistency beats intensity. Keep going!",
+        "Small gains every day add up to big results.",
+        "Fuel your body. Honor your training.",
+        "Today's effort is tomorrow's strength.",
+        "Discipline creates freedom — train for it."
+      ];
+      const idx = new Date().getDate() % motivations.length;
+      setMotivation(motivations[idx]);
+    }
+  };
+
   const handleLogout = () => {
-    localStorage.removeItem("currentUser"); // ✅ Clear user data
-    router.push("/home", "root", "replace"); // ✅ Redirect back to home
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    router.push("/home", "root", "replace");
   };
 
-  // Alternative navigation methods for testing
-  const handleQrAttendanceNavigation = () => {
-    console.log('QR Attendance clicked');
-    
-    // Method 1: Try direct router push
-    try {
-      router.push('/myattendance', 'forward', 'push');
-    } catch (error) {
-      console.error('Method 1 failed:', error);
-      
-      // Method 2: Try with different animation
-      try {
-        router.push('/myattendance', 'root', 'replace');
-      } catch (error2) {
-        console.error('Method 2 failed:', error2);
-        
-        // Method 3: Try window location
-        window.location.href = '/myattendance';
-      }
-    }
-  };
-
-  // ✅ Navigation handler function with error handling
   const handleNavigation = (path: string) => {
-    console.log(`Attempting to navigate to: ${path}`);
-    
-    // Check if we're in a valid navigation context
-    if (!router) {
-      console.error('Router is not available');
-      return;
-    }
-
-    try {
-      // Use Ionic router for navigation
-      router.push(path, "forward", "push");
-      console.log(`Successfully navigated to: ${path}`);
-    } catch (error) {
-      console.error(`Navigation error for path ${path}:`, error);
-      
-      // Try alternative navigation method
-      try {
-        router.push(path, "root", "replace");
-      } catch (fallbackError) {
-        console.error('Fallback navigation also failed:', fallbackError);
-        alert(`Cannot navigate to ${path}. Please check if the route exists.`);
-      }
-    }
+    console.log(`Navigating to: ${path}`);
+    router.push(path, "forward");
   };
 
   return (
@@ -92,6 +103,12 @@ const MemberDashboard: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonTitle>Member Dashboard</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={handleLogout}>
+              <IonIcon icon={logOut} slot="start" />
+              Logout
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
@@ -110,124 +127,73 @@ const MemberDashboard: React.FC = () => {
             <nav>
               <ul className="nav-menu">
                 <li className="nav-item">
-                  <button 
-                    className="nav-link active"
-                    onClick={() => handleNavigation("/member-dashboard")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
+                  <button
+                    className="nav-link"
+                    onClick={() => handleNavigation("/member")}
                   >
-                    <i className="fas fa-home"></i>
+                    <IonIcon icon={home} />
                     Dashboard
                   </button>
                 </li>
                 <li className="nav-item">
-                  <button 
+                  <button
                     className="nav-link"
-                    onClick={() => handleNavigation("/myattendance")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
+                    onClick={() => handleNavigation("/member/qr")}
                   >
-                    <i className="fas fa-calendar-check"></i>
+                    <IonIcon icon={qrCode} />
                     QR Attendance
                   </button>
                 </li>
                 <li className="nav-item">
-                  <button 
+                  <button
                     className="nav-link"
-                    onClick={() => handleNavigation("/calorie")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
+                    onClick={() => handleNavigation("/member/attendance")}
                   >
-                    <i className="fas fa-calculator"></i>
+                    <IonIcon icon={calendarOutline} />
+                    My Attendance
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button
+                    className="nav-link"
+                    onClick={() => handleNavigation("/member/calorie")}
+                  >
+                    <IonIcon icon={calculator} />
                     Calorie Calculator
                   </button>
                 </li>
+                
                 <li className="nav-item">
-                  <button 
+                  <button
                     className="nav-link"
-                    onClick={() => handleNavigation("/mealplan")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
+                    onClick={() => handleNavigation("/member/meal-planner")}
                   >
-                    <i className="fas fa-utensils"></i>
-                    Meal Plan
+                    <IonIcon icon={restaurant} />
+                    Meal Planner
+                  </button>
+                </li>
+
+                <li className="nav-item">
+                  <button
+                    className="nav-link"
+                    onClick={() => handleNavigation("/member/progress")}
+                  >
+                    <IonIcon icon={trendingUp} />
+                    Progress Tracker
                   </button>
                 </li>
                 <li className="nav-item">
-                  <button 
+                  <button
                     className="nav-link"
-                    onClick={() => handleNavigation("/progress")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <i className="fas fa-chart-line"></i>
-                    Progress
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button 
-                    className="nav-link"
-                    onClick={() => handleNavigation("/settings")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <i className="fas fa-cog"></i>
-                    Settings
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button 
-                    className="nav-link"
-                    onClick={() => handleNavigation("/muscle-gain")}
+                    onClick={() => handleNavigation("/member/muscle-gain")}
                   >
                     <IonIcon icon={barbell} />
                     Muscle Gain Tracker
                   </button>
                 </li>
-                {/* ✅ Logout now works */}
                 <li className="nav-item">
-                  <button
-                    className="nav-link logout-btn"
-                    onClick={handleLogout}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <i className="fas fa-sign-out-alt"></i>
+                  <button className="nav-link logout-btn" onClick={handleLogout}>
+                    <IonIcon icon={logOut} />
                     Logout
                   </button>
                 </li>
@@ -243,89 +209,133 @@ const MemberDashboard: React.FC = () => {
                   <h1>Welcome back, {firstName}! 👋</h1>
                   <p>Track your fitness journey and achieve your goals</p>
                 </div>
-                <div className="quick-stats">
-                  <span className="attendance-streak">
-                    <i className="fas fa-fire"></i>
-                    Streak: 5 days
-                  </span>
+
+                {/* replaced quick-stats with motivation and streak */}
+                <div className="hero-motivation">
+                  <div className="motivation-text">{motivation}</div>
+                  <div className="streak-pill">
+                    <IonIcon icon={flame} /> Streak: {streak} days
+                  </div>
                 </div>
               </header>
 
               <section className="dashboard-grid">
-                <div 
+                <div
                   className="dashboard-card"
-                  onClick={() => handleNavigation("/calorie")}
-                  style={{ cursor: "pointer" }}
+                  onClick={() => handleNavigation("/member/qr")}
                 >
-                  <i className="fas fa-calculator card-icon"></i>
-                  <h3 className="card-title">Check My Calories</h3>
-                  <p className="card-description">
-                    Calculate your daily calorie needs
-                  </p>
-                </div>
-
-                <div 
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/mealplan")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <i className="fas fa-utensils card-icon"></i>
-                  <h3 className="card-title">Meal Planner</h3>
-                  <p className="card-description">
-                    View your personalized meal plan
-                  </p>
-                </div>
-
-                <div 
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/progress")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <i className="fas fa-chart-line card-icon"></i>
-                  <h3 className="card-title">Track Progress</h3>
-                  <p className="card-description">
-                    Monitor your fitness journey
-                  </p>
-                </div>
-
-                <div 
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/myattendance")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <i className="fas fa-qrcode card-icon"></i>
+                  <IonIcon icon={qrCode} className="card-icon" />
                   <h3 className="card-title">QR Attendance</h3>
-                  <p className="card-description">
-                    Scan QR code for attendance tracking
-                  </p>
+                  <p className="card-description">Scan to check-in</p>
+                </div>
+
+                <div
+                  className="dashboard-card"
+                  onClick={() => handleNavigation("/member/calorie")}
+                >
+                  <IonIcon icon={calculator} className="card-icon" />
+                  <h3 className="card-title">Calorie Calculator</h3>
+                  <p className="card-description">Track your calories</p>
+                </div>
+
+                <div
+                  className="dashboard-card"
+                  onClick={() => handleNavigation("/member/meal-planner")}
+                >
+                  <IonIcon icon={restaurant} className="card-icon" />
+                  <h3 className="card-title">Meal Planner</h3>
+                  <p className="card-description">Plan your meals</p>
+                </div>
+
+                <div
+                  className="dashboard-card"
+                  onClick={() => handleNavigation("/member/progress")}
+                >
+                  <IonIcon icon={trendingUp} className="card-icon" />
+                  <h3 className="card-title">Progress Tracker</h3>
+                  <p className="card-description">Track your progress</p>
+                </div>
+
+                <div
+                  className="dashboard-card"
+                  onClick={() => handleNavigation("/member/muscle-gain")}
+                >
+                  <IonIcon icon={barbell} className="card-icon" />
+                  <h3 className="card-title">Muscle Gain</h3>
+                  <p className="card-description">Build muscle</p>
                 </div>
               </section>
 
               <section className="progress-section">
                 <div className="progress-header">
-                  <h2 className="progress-title">Your Progress</h2>
-                  <button className="btn-update">Update Progress</button>
+                  <h2 className="progress-title">Daily Motivation</h2>
+                  <p className="progress-subtitle">Short reminders to keep you consistent</p>
                 </div>
 
                 <div className="progress-grid">
-                  <div className="progress-item">
-                    <h4>Weight</h4>
-                    <p>75 kg</p>
-                  </div>
-                  <div className="progress-item">
-                    <h4>Body Fat</h4>
-                    <p>18%</p>
-                  </div>
-                  <div className="progress-item">
-                    <h4>Muscle Mass</h4>
-                    <p>32%</p>
-                  </div>
-                  <div className="progress-item">
-                    <h4>BMI</h4>
-                    <p>22.5</p>
+                  {(() => {
+                    const allMotivations = [
+                      "One step at a time — your progress matters.",
+                      "Show up today. Your future self will thank you.",
+                      "Consistency beats intensity. Keep going!",
+                      "Small gains every day add up to big results.",
+                      "Fuel your body. Honor your training.",
+                      "Today's effort is tomorrow's strength.",
+                      "Discipline creates freedom — train for it."
+                    ];
+                    const baseIdx = new Date().getDate() % allMotivations.length;
+                    const mot1 = allMotivations[baseIdx];
+                    const mot2 = allMotivations[(baseIdx + 1) % allMotivations.length];
+                    const mot3 = allMotivations[(baseIdx + 2) % allMotivations.length];
+
+                    return (
+                      <>
+                        <div className="progress-item motivation-card">
+                          <IonIcon icon={calendar} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
+                          <h4>Motivation</h4>
+                          <p>{mot1}</p>
+                        </div>
+
+                        <div className="progress-item motivation-card">
+                          <IonIcon icon={flame} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
+                          <h4>Tip</h4>
+                          <p>{mot2}</p>
+                        </div>
+
+                        <div className="progress-item motivation-card">
+                          <IonIcon icon={trendingUp} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
+                          <h4>Goal</h4>
+                          <p>{mot3}</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </section>
+
+              <section className="progress-section">
+                <div className="progress-header">
+                  <h2 className="progress-title">Subscription Status</h2>
+                </div>
+                
+                <div className="progress-grid">
+                  <div className="progress-item" style={{ gridColumn: '1 / -1' }}>
+                    <IonIcon icon={card} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
+                    <h4>Active Membership</h4>
+                    <p>Monthly Plan</p>
                   </div>
                 </div>
               </section>
+
+              <IonButton 
+                expand="block" 
+                color="success"
+                onClick={() => handleNavigation("/member/payment")}
+                style={{ marginTop: '2rem' }}
+              >
+                <IonIcon icon={card} slot="start" />
+                Renew Subscription
+              </IonButton>
             </div>
           </main>
         </div>
