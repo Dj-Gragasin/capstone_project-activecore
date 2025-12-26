@@ -8,6 +8,7 @@ import {
   IonLoading,
   IonAlert,
 } from '@ionic/react';
+import { API_CONFIG } from '../config/api.config';
 import './Payment.css';
 
 // Types
@@ -37,9 +38,9 @@ const Payment: React.FC = () => {
     plan: '',
     card: '',
     expiry: '',
-import { API_CONFIG } from '../config/api.config';
-
-// ... other imports and component code ...
+    cvc: '',
+    paymentMethod: 'card',
+  });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);

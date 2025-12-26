@@ -50,7 +50,7 @@ export const ensureToken = async (options?: { devEmail?: string }): Promise<stri
 
   try {
     const devEmail = options?.devEmail || 'member@activecore.com';
-    const res = await fetch(`${API_URL}/dev/token`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/dev/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: devEmail }),
@@ -58,16 +58,13 @@ export const ensureToken = async (options?: { devEmail?: string }): Promise<stri
 
     const json = await res.json();
     if (!res.ok || !json.success || !json.token) {
-      console.warn('Dev token not available:', json);
       return null;
     }
 
     localStorage.setItem('token', json.token);
     if (json.user) localStorage.setItem('user', JSON.stringify(json.user));
-    console.log('✅ Dev token stored for', devEmail);
     return json.token;
   } catch (err: any) {
-    console.error('❌ ensureToken error', err);
     return null;
   }
 };
