@@ -329,12 +329,12 @@ const MemberDashboard: React.FC = () => {
 
               <IonButton 
                 expand="block" 
-                color="success"
-                onClick={() => handleNavigation("/member/payment")}
+                color="medium"
+                disabled
                 style={{ marginTop: '2rem' }}
               >
                 <IonIcon icon={card} slot="start" />
-                Renew Subscription
+                Renew Subscription - Coming Soon
               </IonButton>
             </div>
           </main>

@@ -236,101 +236,28 @@ const MemberPayment: React.FC = () => {
             </IonCard>
           )}
 
-          {/* Renewal Card */}
+          {/* Renewal Card - Coming Soon */}
           <IonCard className="renewal-card">
             <IonCardContent>
-              <h2 className="card-title-primary">Renew Subscription</h2>
-
-              <IonItem className="plan-selector">
-                <IonLabel className="select-label">Select Plan</IonLabel>
-                <IonSelect
-                  className="plan-select"
-                  value={selectedPlan}
-                  onIonChange={(e) => setSelectedPlan(e.detail.value)}
-                  disabled={isProcessing}
-                >
-                  <IonSelectOption value="monthly">
-                    Monthly - ₱1,500
-                  </IonSelectOption>
-                  <IonSelectOption value="quarterly">
-                    Quarterly - ₱4,000
-                  </IonSelectOption>
-                  <IonSelectOption value="annual">
-                    Annual - ₱15,000
-                  </IonSelectOption>
-                </IonSelect>
-              </IonItem>
-
-              <div className="payment-summary">
-                <h3 className="summary-title">Payment Summary</h3>
-                <div className="summary-details">
-                  <div className="summary-row">
-                    <span>Plan</span>
-                    <strong>{selectedPlan.toUpperCase()}</strong>
-                  </div>
-                  <div className="summary-row total">
-                    <span>Total Amount</span>
-                    <span className="amount">
-                      ₱{MEMBERSHIP_PRICES[selectedPlan].toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="payment-options">
-                <h3 className="options-title">Payment Options</h3>
-
-                {/* PayPal Payment Button */}
-                <IonButton
-                  expand="block"
-                  className="paypal-button"
-                  onClick={handlePayPalPayment}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <>
-                      <IonSpinner name="crescent" style={{ marginRight: '0.5rem' }} />
-                      Processing Payment...
-                    </>
-                  ) : (
-                    <>
-                      <IonIcon icon={wallet} slot="start" />
-                      Pay with PayPal - Instant Activation ⚡
-                    </>
-                  )}
-                </IonButton>
-
-                <div className="instant-access-badge">
-                  <IonIcon icon={checkmarkCircle} style={{ color: '#00e676' }} />
-                  <span>Instant access after payment - No waiting!</span>
-                </div>
-
-                {/* Cash Payment Info */}
-                <div className="payment-divider">
-                  <span>OR</span>
-                </div>
-
-                <div className="cash-info">
-                  <IonIcon icon={cash} />
-                  <div className="cash-text">
-                    <strong>Pay at Gym Counter</strong>
-                    <p>
-                      Visit our gym and pay directly with cash or bank transfer.
-                      Instant activation by admin - fast and convenient!
-                    </p>
-                  </div>
-                </div>
-
-                <div className="gym-location">
-                  <IonIcon icon={location} />
-                  <div>
-                    <strong>Gym Location</strong>
-                    <p>123 Fitness Street, Barangay Rizal, Makati City</p>
-                    <p style={{ marginTop: '0.5rem', color: '#00e676' }}>
-                      Open: Mon-Sun, 6:00 AM - 10:00 PM
-                    </p>
-                  </div>
-                </div>
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem 1rem',
+                color: '#999',
+              }}>
+                <IonIcon 
+                  icon={wallet} 
+                  style={{
+                    fontSize: '3rem',
+                    color: '#ccc',
+                    marginBottom: '1rem',
+                    display: 'block'
+                  }}
+                />
+                <h2 className="card-title-primary" style={{ color: '#666' }}>Renewal Subscription</h2>
+                <p style={{ fontSize: '1.1rem', marginTop: '1rem', color: '#999' }}>Coming Soon</p>
+                <p style={{ fontSize: '0.9rem', color: '#bbb', marginTop: '0.5rem' }}>
+                  The subscription renewal feature is currently under development. We'll notify you when it's ready!
+                </p>
               </div>
             </IonCardContent>
           </IonCard>
