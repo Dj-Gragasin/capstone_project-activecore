@@ -11,6 +11,8 @@ import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 import rateLimit from 'express-rate-limit';
+import logger, { logError, logWarn, logInfo, logDebug } from './utils/logger';
+import { securityHeaders } from './middleware/securityHeaders';
 // Avoid startup crash if OPENAI_API_KEY missing
 let openai: OpenAI | undefined;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
@@ -64,6 +66,9 @@ app.use(cors({ origin: true, credentials: true }));
 app.options('*', cors({ origin: true, credentials: true }));
 
 app.use(express.json());
+
+// Apply security headers to all responses
+app.use(securityHeaders);
 
 // Apply general rate limiting to all requests
 app.use(generalLimiter);
@@ -825,6 +830,7 @@ app.post('/api/auth/change-password', async (req, res) => {
 
     res.json({ message: 'Password updated successfully' });
   } catch (error: any) {
+    logError('Password change failed', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -956,6 +962,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       userId,
     });
   } catch (error: any) {
+    logError('User registration failed', error, { email: req.body.email });
     res.status(500).json({ 
       success: false, 
       message: getErrorMessage(error) || 'Registration failed' 
@@ -2282,11 +2289,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   const errorId = uuidv4().substring(0, 8);
   const isDevelopment = process.env.NODE_ENV === 'development';
   
-  
-  // Don't expose stack traces in production
-  if (!isDevelopment) {
-  } else {
-  }
+  // Log to structured logger
+  logError(`Request error [${errorId}]`, err, {
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+  });
   
   // Determine HTTP status code
   const statusCode = err.status || err.statusCode || 500;

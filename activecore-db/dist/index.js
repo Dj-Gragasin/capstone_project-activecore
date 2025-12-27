@@ -24,6 +24,8 @@ const axios_1 = __importDefault(require("axios"));
 const uuid_1 = require("uuid");
 const openai_1 = __importDefault(require("openai"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const logger_1 = require("./utils/logger");
+const securityHeaders_1 = require("./middleware/securityHeaders");
 // Avoid startup crash if OPENAI_API_KEY missing
 let openai;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
@@ -69,6 +71,8 @@ const generalLimiter = (0, express_rate_limit_1.default)({
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.options('*', (0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json());
+// Apply security headers to all responses
+app.use(securityHeaders_1.securityHeaders);
 // Apply general rate limiting to all requests
 app.use(generalLimiter);
 // Debug: log incoming requests and origin so we can diagnose CORS issues
@@ -734,6 +738,7 @@ app.post('/api/auth/change-password', (req, res) => __awaiter(void 0, void 0, vo
         res.json({ message: 'Password updated successfully' });
     }
     catch (error) {
+        (0, logger_1.logError)('Password change failed', error);
         res.status(500).json({ message: 'Server error' });
     }
 }));
@@ -831,6 +836,7 @@ app.post('/api/register', registerLimiter, (req, res) => __awaiter(void 0, void 
         });
     }
     catch (error) {
+        (0, logger_1.logError)('User registration failed', error, { email: req.body.email });
         res.status(500).json({
             success: false,
             message: getErrorMessage(error) || 'Registration failed'
@@ -1979,11 +1985,12 @@ app.use((err, req, res, next) => {
     // Log error internally (without sensitive data)
     const errorId = (0, uuid_1.v4)().substring(0, 8);
     const isDevelopment = process.env.NODE_ENV === 'development';
-    // Don't expose stack traces in production
-    if (!isDevelopment) {
-    }
-    else {
-    }
+    // Log to structured logger
+    (0, logger_1.logError)(`Request error [${errorId}]`, err, {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+    });
     // Determine HTTP status code
     const statusCode = err.status || err.statusCode || 500;
     // Safe error response
