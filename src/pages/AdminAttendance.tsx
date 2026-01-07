@@ -63,16 +63,29 @@ const AdminAttendance: React.FC = () => {
   const generateQRCode = async () => {
     try {
       setGeneratingQR(true);
-      const response = await fetch(`${API_URL}/admin/qr-token/generate`, {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        alert("No authentication token found. Please login again.");
+        return;
+      }
+      
+      const url = `${API_URL}/admin/qr-token/generate`;
+      console.log("📡 Calling:", url);
+      
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ expiresInHours: 24 }),
       });
 
+      console.log("📊 Response status:", response.status);
+      
       const data = await response.json();
+      console.log("📦 Response data:", data);
 
       if (data.success) {
         setQrToken(data.token);
@@ -80,9 +93,11 @@ const AdminAttendance: React.FC = () => {
         console.log("✅ QR Code generated:", data.token);
       } else {
         console.error("❌ Failed to generate QR code:", data.message);
+        alert("Failed to generate QR code: " + (data.message || "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Error generating QR code:", error);
+      alert("Error: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setGeneratingQR(false);
     }

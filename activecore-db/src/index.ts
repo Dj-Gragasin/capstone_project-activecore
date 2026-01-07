@@ -26,6 +26,7 @@ if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
 }
 import nodemailer, { Transporter } from 'nodemailer';
 import crypto from 'crypto';
+import qrTokenRouter from './routes/qrToken';
 
 const app = express();
 
@@ -60,7 +61,7 @@ const registerLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // General API limit: 30 requests per minute per IP
+  max: 100, // General API limit: 100 requests per minute per IP (increased from 30)
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -69,8 +70,8 @@ const generalLimiter = rateLimit({
 app.use(cors({ origin: true, credentials: true }));
 app.options('*', cors({ origin: true, credentials: true }));
 
-// Sentry request handler - must be early in the middleware stack
-app.use(sentryRequestHandler);
+// Sentry request handler - DISABLED for debugging
+// app.use(sentryRequestHandler);
 
 app.use(express.json());
 
@@ -1002,7 +1003,7 @@ app.get('/api/members', async (req, res) => {
         COUNT(p.id) as totalPayments
       FROM users u
       LEFT JOIN payments p ON u.id = p.user_id
-      WHERE u.role = "member"
+      WHERE u.role = 'member'
       GROUP BY u.id`
     );
 
@@ -1223,7 +1224,7 @@ app.delete('/api/members/:id', async (req, res) => {
     const { id } = req.params;
 
     const [result] = await pool.query(
-      'DELETE FROM users WHERE id = ? AND role = "member"',
+      'DELETE FROM users WHERE id = ? AND role = \'member\'',
       [id]
     );
 
@@ -1452,7 +1453,6 @@ app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, r
         p.transaction_id,
         p.subscription_start,
         p.subscription_end,
-        p.notes,
         u.first_name as firstName,
         u.last_name as lastName,
         u.email
@@ -2279,56 +2279,14 @@ app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
   }
 });
 
-// Global error handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  res.status(500).json({ success: false, message: 'Internal Server Error' });
-});
-
-// Handle uncaught exceptions and unhandled rejections
-process.on('uncaughtException', (err: any) => {
-});
-
-// ============================================
-// SENTRY ERROR HANDLER
-// ============================================
-// Must be added AFTER route handlers and BEFORE the final error handler
-app.use(sentryErrorHandler);
-
 // ============================================
 // ERROR HANDLING MIDDLEWARE
 // ============================================
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  // Log error internally (without sensitive data)
-  const errorId = uuidv4().substring(0, 8);
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
-  // Log to structured logger
-  logError(`Request error [${errorId}]`, err, {
-    path: req.path,
-    method: req.method,
-    ip: req.ip,
-  });
-  
-  // Determine HTTP status code
-  const statusCode = err.status || err.statusCode || 500;
-  
-  // Safe error response
-  const errorResponse = {
-    success: false,
-    message: isDevelopment ? err.message : 'An error occurred processing your request',
-    ...(isDevelopment && { errorId, stack: err.stack })
-  };
-  
-  res.status(statusCode).json(errorResponse);
-});
-
-// 404 handler - must be last
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint not found',
-    path: req.path,
-    method: req.method
+  console.error('Global error:', err.message);
+  res.status(500).json({ 
+    success: false, 
+    message: 'Server error'
   });
 });
 
@@ -2345,48 +2303,52 @@ app.get('/api/ping', (req: Request, res: Response) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
-async function startServer() {
-  try {
-    try {
-      dbConnected = await initializeDatabase();
-    } catch (dbErr: any) {
-      dbConnected = false;
-    }
+// Test endpoints removed for production
 
-    const portNum = Number(process.env.PORT || PORT || 3002);
-    app.listen(portNum, () => {
-    }).on('error', (err: any) => {
-      process.exit(1);
-    });
-  } catch (err: any) {
-    process.exit(1);
-  }
-}
+// ===== SERVER INITIALIZATION =====
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Activecore Backend: running');
 });
 
-startServer();
+// QR Token Generation - register BEFORE 404 handler
+app.use('/api/admin/qr-token', qrTokenRouter);
 
-// QR Token Generation for Attendance (Admin)
-app.post('/api/admin/qr-token/generate', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    // You can make this more secure by encoding gym, date, and expiry
-    const { expiresInHours = 24 } = req.body;
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000);
-    // Example token: ACTIVECORE_GYM_YYYYMMDDHHMMSS_random
-    const token = `ACTIVECORE_GYM_${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-    res.json({
-      success: true,
-      token,
-      expiresAt: expiresAt.toISOString()
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: "Failed to generate QR token." });
-  }
+// 404 handler - must be registered BEFORE initialize()
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.path,
+    method: req.method
+  });
 });
+
+// Initialize database and start server - WILL BE CALLED AT THE END OF FILE
+async function initialize() {
+  try {
+    // Create a timeout promise to prevent indefinite hanging
+    const timeoutPromise = new Promise<boolean>((_, reject) => 
+      setTimeout(() => reject(new Error('Database initialization timeout')), 30000)
+    );
+    
+    const dbPromise = Promise.resolve(initializeDatabase());
+    
+    dbConnected = await Promise.race([dbPromise, timeoutPromise]);
+  } catch (dbErr: any) {
+    console.error('Database initialization error:', dbErr.message);
+    dbConnected = false;
+  }
+  
+  // Start server AFTER all routes are registered
+  const portNum = Number(process.env.PORT || PORT || 3002);
+  app.listen(portNum, () => {
+    console.log(`\n✅ Server running on port ${portNum}`);
+  }).on('error', (err: any) => {
+    console.error('Server error:', err);
+    process.exit(1);
+  });
+}
 
 // Ensure this runs after pool and env are ready
 (async function ensureNotificationTable() {
@@ -2887,4 +2849,5 @@ app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: Au
   }
 });
 
-
+// Start server AFTER all routes and middleware are registered
+initialize();

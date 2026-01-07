@@ -24,7 +24,6 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_config_1 = require("./config/db.config");
 const axios_1 = __importDefault(require("axios"));
-const uuid_1 = require("uuid");
 const openai_1 = __importDefault(require("openai"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const logger_1 = require("./utils/logger");
@@ -38,6 +37,7 @@ else {
     openai = undefined;
 }
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const qrToken_1 = __importDefault(require("./routes/qrToken"));
 const app = (0, express_1.default)();
 // ============================================
 // SECURITY: Validate JWT_SECRET at startup
@@ -66,15 +66,15 @@ const registerLimiter = (0, express_rate_limit_1.default)({
 });
 const generalLimiter = (0, express_rate_limit_1.default)({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 30, // General API limit: 30 requests per minute per IP
+    max: 100, // General API limit: 100 requests per minute per IP (increased from 30)
     standardHeaders: true,
     legacyHeaders: false,
 });
 // Dev CORS: allow all in development for quick debugging
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.options('*', (0, cors_1.default)({ origin: true, credentials: true }));
-// Sentry request handler - must be early in the middleware stack
-app.use(sentry_config_1.sentryRequestHandler);
+// Sentry request handler - DISABLED for debugging
+// app.use(sentryRequestHandler);
 app.use(express_1.default.json());
 // Apply security headers to all responses
 app.use(securityHeaders_1.securityHeaders);
@@ -871,7 +871,7 @@ app.get('/api/members', (req, res) => __awaiter(void 0, void 0, void 0, function
         COUNT(p.id) as totalPayments
       FROM users u
       LEFT JOIN payments p ON u.id = p.user_id
-      WHERE u.role = "member"
+      WHERE u.role = 'member'
       GROUP BY u.id`);
         const transformedMembers = members.map((member) => ({
             id: member.id,
@@ -1029,7 +1029,7 @@ app.put('/api/members/:id', authenticateToken, (req, res) => __awaiter(void 0, v
 app.delete('/api/members/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const [result] = yield db_config_1.pool.query('DELETE FROM users WHERE id = ? AND role = "member"', [id]);
+        const [result] = yield db_config_1.pool.query('DELETE FROM users WHERE id = ? AND role = \'member\'', [id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Member not found' });
         }
@@ -1217,7 +1217,6 @@ app.get('/api/admin/payments/all', authenticateToken, (req, res) => __awaiter(vo
         p.transaction_id,
         p.subscription_start,
         p.subscription_end,
-        p.notes,
         u.first_name as firstName,
         u.last_name as lastName,
         u.email
@@ -1976,44 +1975,14 @@ app.get('/api/user/profile', authenticateToken, (req, res) => __awaiter(void 0, 
         res.status(500).json({ success: false, message: 'Failed to fetch user profile.' });
     }
 }));
-// Global error handler
-app.use((err, req, res, next) => {
-    res.status(500).json({ success: false, message: 'Internal Server Error' });
-});
-// Handle uncaught exceptions and unhandled rejections
-process.on('uncaughtException', (err) => {
-});
-// ============================================
-// SENTRY ERROR HANDLER
-// ============================================
-// Must be added AFTER route handlers and BEFORE the final error handler
-app.use(sentry_config_1.sentryErrorHandler);
 // ============================================
 // ERROR HANDLING MIDDLEWARE
 // ============================================
 app.use((err, req, res, next) => {
-    // Log error internally (without sensitive data)
-    const errorId = (0, uuid_1.v4)().substring(0, 8);
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    // Log to structured logger
-    (0, logger_1.logError)(`Request error [${errorId}]`, err, {
-        path: req.path,
-        method: req.method,
-        ip: req.ip,
-    });
-    // Determine HTTP status code
-    const statusCode = err.status || err.statusCode || 500;
-    // Safe error response
-    const errorResponse = Object.assign({ success: false, message: isDevelopment ? err.message : 'An error occurred processing your request' }, (isDevelopment && { errorId, stack: err.stack }));
-    res.status(statusCode).json(errorResponse);
-});
-// 404 handler - must be last
-app.use((req, res) => {
-    res.status(404).json({
+    console.error('Global error:', err.message);
+    res.status(500).json({
         success: false,
-        message: 'Endpoint not found',
-        path: req.path,
-        method: req.method
+        message: 'Server error'
     });
 });
 process.on('unhandledRejection', (reason) => {
@@ -2024,49 +1993,45 @@ let dbConnected = false;
 app.get('/api/ping', (req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });
 });
-function startServer() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            try {
-                dbConnected = yield (0, db_config_1.initializeDatabase)();
-            }
-            catch (dbErr) {
-                dbConnected = false;
-            }
-            const portNum = Number(process.env.PORT || PORT || 3002);
-            app.listen(portNum, () => {
-            }).on('error', (err) => {
-                process.exit(1);
-            });
-        }
-        catch (err) {
-            process.exit(1);
-        }
-    });
-}
+// Test endpoints removed for production
+// ===== SERVER INITIALIZATION =====
 app.get('/', (req, res) => {
     res.send('Activecore Backend: running');
 });
-startServer();
-// QR Token Generation for Attendance (Admin)
-app.post('/api/admin/qr-token/generate', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        // You can make this more secure by encoding gym, date, and expiry
-        const { expiresInHours = 24 } = req.body;
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000);
-        // Example token: ACTIVECORE_GYM_YYYYMMDDHHMMSS_random
-        const token = `ACTIVECORE_GYM_${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        res.json({
-            success: true,
-            token,
-            expiresAt: expiresAt.toISOString()
+// QR Token Generation - register BEFORE 404 handler
+app.use('/api/admin/qr-token', qrToken_1.default);
+// 404 handler - must be registered BEFORE initialize()
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Endpoint not found',
+        path: req.path,
+        method: req.method
+    });
+});
+// Initialize database and start server - WILL BE CALLED AT THE END OF FILE
+function initialize() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            // Create a timeout promise to prevent indefinite hanging
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timeout')), 30000));
+            const dbPromise = Promise.resolve((0, db_config_1.initializeDatabase)());
+            dbConnected = yield Promise.race([dbPromise, timeoutPromise]);
+        }
+        catch (dbErr) {
+            console.error('Database initialization error:', dbErr.message);
+            dbConnected = false;
+        }
+        // Start server AFTER all routes are registered
+        const portNum = Number(process.env.PORT || PORT || 3002);
+        app.listen(portNum, () => {
+            console.log(`\n✅ Server running on port ${portNum}`);
+        }).on('error', (err) => {
+            console.error('Server error:', err);
+            process.exit(1);
         });
-    }
-    catch (err) {
-        res.status(500).json({ success: false, message: "Failed to generate QR token." });
-    }
-}));
+    });
+}
 // Ensure this runs after pool and env are ready
 (function ensureNotificationTable() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -2495,3 +2460,5 @@ app.post('/api/payments/paypal/capture-order', authenticateToken, (req, res) => 
         res.status(500).json({ success: false, message: 'Failed to capture PayPal payment' });
     }
 }));
+// Start server AFTER all routes and middleware are registered
+initialize();

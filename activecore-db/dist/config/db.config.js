@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.initializeDatabase = initializeDatabase;
@@ -30,7 +31,8 @@ const pgPool = new pg_1.Pool({
     database: process.env.DB_NAME || 'activecore',
     max: 10,
     idleTimeoutMillis: 60000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 10000, // Increased from 2000ms to 10000ms for remote databases
+    ssl: ((_a = process.env.DB_HOST) === null || _a === void 0 ? void 0 : _a.includes('render.com')) ? { rejectUnauthorized: false } : false,
 });
 // Create wrapper to provide MySQL-compatible interface
 class MySQLCompatiblePool {
@@ -73,12 +75,18 @@ function initializeDatabase() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             console.log('\n🔌 Connecting to database...');
-            const connection = yield exports.pool.getConnection();
+            console.log('   Host:', process.env.DB_HOST || 'localhost');
+            console.log('   Port:', process.env.DB_PORT || '5432');
+            console.log('   User:', process.env.DB_USER || 'postgres');
+            console.log('   Database:', process.env.DB_NAME || 'activecore');
+            // Test connection by running a simple query with timeout
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout - database unreachable')), 15000));
+            const queryPromise = pgPool.query('SELECT NOW()');
+            yield Promise.race([queryPromise, timeoutPromise]);
             console.log('✅ Database connected successfully!');
             console.log('🗄️  Database:', process.env.DB_NAME || 'activecore');
-            console.log('📊 Backend:', process.env.DB_HOST || 'localhost');
+            console.log('📊 Host:', process.env.DB_HOST || 'localhost');
             console.log('');
-            connection.release();
             return true;
         }
         catch (error) {
@@ -88,12 +96,19 @@ function initializeDatabase() {
             console.error('Error:', error.message);
             console.error('Code:', error.code);
             console.error('');
+            console.error('Attempted connection:');
+            console.error('  Host:', process.env.DB_HOST || 'localhost');
+            console.error('  Port:', process.env.DB_PORT || '5432');
+            console.error('  User:', process.env.DB_USER || 'postgres');
+            console.error('  Database:', process.env.DB_NAME || 'activecore');
+            console.error('');
             console.error('📝 Troubleshooting steps:');
-            console.error('1. Check if PostgreSQL is running on Render');
-            console.error('2. Verify database "activecore" exists');
-            console.error('3. Confirm PostgreSQL is on port 5432');
-            console.error('4. Check .env file configuration');
-            console.error('5. Verify DB_HOST matches Render connection string');
+            console.error('1. Verify .env file exists in activecore-db/ folder');
+            console.error('2. Check DB_HOST is correct (e.g., your-render-db.render.com)');
+            console.error('3. Confirm DB_PASSWORD is set and correct');
+            console.error('4. Verify database "activecore" exists on the server');
+            console.error('5. Check if PostgreSQL is running and accessible');
+            console.error('6. Ensure your IP is whitelisted (if applicable)');
             console.error('========================================\n');
             return false;
         }
