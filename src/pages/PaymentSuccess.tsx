@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { API_CONFIG } from '../config/api.config';
 import {
   IonPage,
@@ -24,12 +24,7 @@ const PaymentSuccess: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<'checking' | 'success' | 'pending'>('checking');
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    capturePayment();
-  }, []);
-
-  const capturePayment = async () => {
+  const capturePayment = useCallback(async () => {
     try {
       // Get orderId from URL params
       const params = new URLSearchParams(window.location.search);
@@ -102,7 +97,11 @@ const PaymentSuccess: React.FC = () => {
     } finally {
       setIsVerifying(false);
     }
-  };
+  }, [presentToast, router]);
+
+  useEffect(() => {
+    capturePayment();
+  }, [capturePayment]);
 
   return (
     <IonPage>

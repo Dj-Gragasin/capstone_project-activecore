@@ -892,22 +892,22 @@ const MealPlanner: React.FC = () => {
             normalizedNewMeal.instructions = generateInstructionFromRecipe(normalizedNewMeal.recipe);
           }
 
+          const nextShoppingList = json?.shoppingList ? normalizeShoppingList(json.shoppingList) : null;
+          const nextPlanId = json?.planId ?? null;
+
           setMealPlan(prev => {
             if (!prev) return prev;
             const next = { ...prev };
-            // eslint-disable-next-line no-loop-func
             next.weekPlan = next.weekPlan.map((d, idx) => {
               if (idx !== dayIndex) return d;
               const updatedMeals = { ...d.meals, [mealKey]: normalizedNewMeal };
               return recomputeDayTotals({ ...d, meals: updatedMeals });
             });
-            if (json.shoppingList) {
-              next.shoppingList = normalizeShoppingList(json.shoppingList);
-            }
+            if (nextShoppingList) next.shoppingList = nextShoppingList;
             return next;
           });
 
-          if (json.planId) setCurrentPlanId(json.planId);
+          if (nextPlanId) setCurrentPlanId(nextPlanId);
 
           presentToast({ message: "🎉 Meal regenerated successfully", duration: 1600, color: "success" });
           setShowEditModal(false);

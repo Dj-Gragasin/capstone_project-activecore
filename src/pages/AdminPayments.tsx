@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   IonPage,
   IonHeader,
@@ -54,23 +54,7 @@ const AdminPayments: React.FC = () => {
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [presentToast] = useIonToast();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    loadPayments();
-    
-    const interval = setInterval(() => {
-      loadPayments();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    filterPayments();
-  }, [searchText, payments]);
-
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       setLoading(true);
       console.log('📊 Loading payment history...');
@@ -123,9 +107,9 @@ const AdminPayments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [presentToast]);
 
-  const filterPayments = () => {
+  const filterPayments = useCallback(() => {
     let filtered = payments;
 
     if (searchText.trim()) {
@@ -139,7 +123,21 @@ const AdminPayments: React.FC = () => {
     }
 
     setFilteredPayments(filtered);
-  };
+  }, [payments, searchText]);
+
+  useEffect(() => {
+    loadPayments();
+
+    const interval = setInterval(() => {
+      loadPayments();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [loadPayments]);
+
+  useEffect(() => {
+    filterPayments();
+  }, [filterPayments]);
 
   const handleRefresh = async (event: any) => {
     await loadPayments();

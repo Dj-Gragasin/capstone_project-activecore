@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -95,17 +95,7 @@ const MembersManagement: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Add this line
   const [presentToast] = useIonToast();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    loadMembers();
-  }, []);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    filterMembers();
-  }, [searchText, members]);
-
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/members`, {
         headers: {
@@ -124,9 +114,9 @@ const MembersManagement: React.FC = () => {
         color: 'danger',
       });
     }
-  };
+  }, [presentToast]);
 
-  const filterMembers = () => {
+  const filterMembers = useCallback(() => {
     if (!searchText.trim()) {
       setFilteredMembers(members);
       return;
@@ -138,7 +128,15 @@ const MembersManagement: React.FC = () => {
         m.email.toLowerCase().includes(searchText.toLowerCase())
     );
     setFilteredMembers(filtered);
-  };
+  }, [members, searchText]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+
+  useEffect(() => {
+    filterMembers();
+  }, [filterMembers]);
 
   const handleAddMember = () => {
     setIsEditing(false);

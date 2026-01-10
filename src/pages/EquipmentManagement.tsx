@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   IonPage,
   IonHeader,
@@ -57,26 +57,16 @@ const EquipmentManagement: React.FC = () => {
     notes: "",
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    loadEquipments();
-  }, []);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    filterEquipments();
-  }, [searchText, equipments]);
-
-  const loadEquipments = () => {
+  const loadEquipments = useCallback(() => {
     const stored = localStorage.getItem("equipments");
     if (stored) {
       const data = JSON.parse(stored);
       setEquipments(data);
       setFilteredEquipments(data);
     }
-  };
+  }, []);
 
-  const filterEquipments = () => {
+  const filterEquipments = useCallback(() => {
     if (!searchText.trim()) {
       setFilteredEquipments(equipments);
       return;
@@ -88,7 +78,15 @@ const EquipmentManagement: React.FC = () => {
       eq.status.toLowerCase().includes(searchText.toLowerCase())
     );
     setFilteredEquipments(filtered);
-  };
+  }, [equipments, searchText]);
+
+  useEffect(() => {
+    loadEquipments();
+  }, [loadEquipments]);
+
+  useEffect(() => {
+    filterEquipments();
+  }, [filterEquipments]);
 
   const handleSave = () => {
     console.log('💾 Attempting to save equipment:', formData);
