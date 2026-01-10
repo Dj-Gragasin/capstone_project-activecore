@@ -54,6 +54,7 @@ const AdminPayments: React.FC = () => {
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [presentToast] = useIonToast();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadPayments();
     

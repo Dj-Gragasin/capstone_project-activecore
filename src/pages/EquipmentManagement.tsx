@@ -57,6 +57,7 @@ const EquipmentManagement: React.FC = () => {
     notes: "",
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadEquipments();
   }, []);
