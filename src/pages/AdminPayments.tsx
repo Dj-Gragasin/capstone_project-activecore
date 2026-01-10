@@ -64,6 +64,7 @@ const AdminPayments: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     filterPayments();
   }, [searchText, payments]);

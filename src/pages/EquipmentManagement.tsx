@@ -61,6 +61,7 @@ const EquipmentManagement: React.FC = () => {
     loadEquipments();
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     filterEquipments();
   }, [searchText, equipments]);

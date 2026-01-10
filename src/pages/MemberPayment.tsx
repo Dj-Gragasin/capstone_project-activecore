@@ -8,23 +8,16 @@ import {
   IonCard,
   IonCardContent,
   IonButton,
-  IonItem,
-  IonLabel,
-  IonSelect,
-  IonSelectOption,
   IonBadge,
   IonIcon,
   IonButtons,
   useIonRouter,
   useIonToast,
-  IonSpinner,
 } from '@ionic/react';
 import {
   calendar,
   warning,
   wallet,
-  cash,
-  location,
   arrowBack,
   checkmarkCircle,
 } from 'ionicons/icons';
@@ -85,6 +78,7 @@ const MemberPayment: React.FC = () => {
     return diffDays;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handlePayPalPayment = async () => {
     if (isProcessing) return;
     

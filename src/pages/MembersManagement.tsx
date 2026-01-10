@@ -99,6 +99,7 @@ const MembersManagement: React.FC = () => {
     loadMembers();
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     filterMembers();
   }, [searchText, members]);

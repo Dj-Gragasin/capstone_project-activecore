@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { API_CONFIG } from '../config/api.config';
 
 export const loginUser = async (email: string, password: string) => {
