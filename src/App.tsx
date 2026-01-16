@@ -101,7 +101,17 @@ const App: React.FC = () => {
         <IonSplitPane contentId="main" when={authState.isAuthed}>
           <AppMenu />
           <IonRouterOutlet id="main">
-            <Route exact path="/home" component={Home} />
+            <Route
+              exact
+              path="/home"
+              render={() =>
+                authState.isAuthed ? (
+                  <Redirect to={authState.role === 'admin' ? '/admin' : '/member'} />
+                ) : (
+                  <Home />
+                )
+              }
+            />
 
           {/* Protected Admin Routes */}
           <PrivateRoute
@@ -196,7 +206,13 @@ const App: React.FC = () => {
           />
 
             {/* Default redirect */}
-            <Route exact path="/" render={() => <Redirect to="/home" />} />
+            <Route
+              exact
+              path="/"
+              render={() => (
+                <Redirect to={authState.isAuthed ? (authState.role === 'admin' ? '/admin' : '/member') : '/home'} />
+              )}
+            />
           </IonRouterOutlet>
         </IonSplitPane>
       </IonReactRouter>
