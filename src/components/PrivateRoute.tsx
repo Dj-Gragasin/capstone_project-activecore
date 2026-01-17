@@ -7,9 +7,23 @@ interface PrivateRouteProps extends RouteProps {
   component: React.ComponentType<any>;
 }
 
+function readRole(): 'admin' | 'member' | undefined {
+  try {
+    const raw = localStorage.getItem('user') || localStorage.getItem('currentUser');
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    const role = (parsed?.role ?? parsed?.user?.role ?? parsed?.data?.role) as unknown;
+    const norm = String(role || '').trim().toLowerCase();
+    if (norm === 'admin' || norm === 'member') return norm as 'admin' | 'member';
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ role, component: Component, ...rest }) => {
-  const isAuthenticated = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAuthenticated = !!localStorage.getItem('token');
+  const currentRole = readRole();
 
   return (
     <Route
@@ -19,8 +33,13 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ role, component: Component,
           return <Redirect to="/home" />;
         }
 
-        if (role && user.role !== role) {
-          return <Redirect to={user.role === 'admin' ? '/admin' : '/member'} />;
+        if (role && currentRole && currentRole !== role) {
+          return <Redirect to={currentRole === 'admin' ? '/admin' : '/member'} />;
+        }
+
+        // If we have a token but can't determine role, send the user home to re-auth.
+        if (role && !currentRole) {
+          return <Redirect to="/home" />;
         }
 
         return <Component {...props} />;

@@ -9,6 +9,9 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
+.env.test
 .cache/
 .next/
 .vercel/
@@ -16,6 +19,13 @@ activecore-db/dist/
 activecore-db/node_modules/
 activecore-db/.env
 *.backup.*
+
+# Android / signing secrets (never commit)
+android/key.properties
+android/local.properties
+**/*.keystore
+**/*.jks
+**/*.p12
 
 # Auto-generated JavaScript files from TypeScript
 src/**/*.js

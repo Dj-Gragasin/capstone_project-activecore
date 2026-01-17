@@ -78,6 +78,12 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const onAuthChanged = () => setAuthState(readAuthState());
+    window.addEventListener('auth-changed', onAuthChanged as EventListener);
+    return () => window.removeEventListener('auth-changed', onAuthChanged as EventListener);
+  }, []);
+
+  useEffect(() => {
     // Also update on initial mount in case localStorage changed before React booted
     setAuthState(readAuthState());
   }, []);
@@ -98,15 +104,16 @@ const App: React.FC = () => {
   return (
     <IonApp>
       <IonReactRouter>
-        <IonSplitPane contentId="main" when={authState.isAuthed}>
+        {/* Only show split-pane sidebar on large screens; mobile uses overlay menu */}
+        <IonSplitPane contentId="main" when={authState.isAuthed ? 'lg' : false}>
           <AppMenu />
           <IonRouterOutlet id="main">
             <Route
               exact
               path="/home"
               render={() =>
-                authState.isAuthed ? (
-                  <Redirect to={authState.role === 'admin' ? '/admin' : '/member'} />
+                readAuthState().isAuthed ? (
+                  <Redirect to={readAuthState().role === 'admin' ? '/admin' : '/member'} />
                 ) : (
                   <Home />
                 )
@@ -210,9 +217,14 @@ const App: React.FC = () => {
               exact
               path="/"
               render={() => (
-                <Redirect to={authState.isAuthed ? (authState.role === 'admin' ? '/admin' : '/member') : '/home'} />
+                <Redirect
+                  to={readAuthState().isAuthed ? (readAuthState().role === 'admin' ? '/admin' : '/member') : '/home'}
+                />
               )}
             />
+
+            {/* Catch-all: never leave the outlet blank */}
+            <Route render={() => <Redirect to="/home" />} />
           </IonRouterOutlet>
         </IonSplitPane>
       </IonReactRouter>

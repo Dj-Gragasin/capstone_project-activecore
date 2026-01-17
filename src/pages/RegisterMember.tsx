@@ -26,6 +26,7 @@ import {
 import Chart from 'chart.js/auto';
 
 import './RegisterMember.css';
+import { logout } from '../services/auth.service';
 
 type MemberProfile = {
   memberName: string;
@@ -146,8 +147,8 @@ const RegisterMember: React.FC = () => {
   }, [chartsData]);
 
   const handleLogout = () => {
-    localStorage.clear();
-    router.push('/login', 'root', 'replace');
+    logout();
+    router.push('/home', 'root', 'replace');
   };
 
   return (

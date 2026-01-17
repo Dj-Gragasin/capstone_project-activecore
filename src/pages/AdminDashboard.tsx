@@ -26,6 +26,7 @@ import {
   checkmarkCircle,
 } from "ionicons/icons";
 import "./AdminDashboard.css";
+import { logout } from "../services/auth.service";
 
 import { API_CONFIG } from "../config/api.config";
 
@@ -177,8 +178,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    logout();
     router.push("/home", "root", "replace");
   };
 

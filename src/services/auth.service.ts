@@ -1,6 +1,14 @@
 import { API_CONFIG } from '../config/api.config';
 import { Capacitor } from '@capacitor/core';
 
+const notifyAuthChanged = () => {
+  try {
+    window.dispatchEvent(new Event('auth-changed'));
+  } catch {
+    // ignore
+  }
+};
+
 export const loginUser = async (email: string, password: string) => {
   try {
     const response = await fetch(`${API_CONFIG.BASE_URL}/auth/login`, {
@@ -27,6 +35,7 @@ export const loginUser = async (email: string, password: string) => {
     if (data.token) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      notifyAuthChanged();
     }
 
     return data;
@@ -62,6 +71,8 @@ export const loginUser = async (email: string, password: string) => {
 export const logout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('currentUser');
+  notifyAuthChanged();
 };
 
 export const getToken = (): string | null => {

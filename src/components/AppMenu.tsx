@@ -29,6 +29,7 @@ import {
   statsChart,
   trendingUp,
 } from 'ionicons/icons';
+import { logout } from '../services/auth.service';
 
 type Role = 'admin' | 'member' | undefined;
 
@@ -133,9 +134,7 @@ const AppMenu: React.FC = () => {
   const effectiveItems = menuItems.length > 0 ? menuItems : (role === 'admin' ? ADMIN_ITEMS : MEMBER_ITEMS);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('currentUser');
+    logout();
     router.push('/home', 'root', 'replace');
   };
 
