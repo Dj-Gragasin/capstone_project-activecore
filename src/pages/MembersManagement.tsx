@@ -12,6 +12,7 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonModal,
+  IonFooter,
   IonInput,
   IonSelect,
   IonSelectOption,
@@ -669,7 +670,7 @@ const MembersManagement: React.FC = () => {
         </div>
 
         {/* Add/Edit Member Modal */}
-        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
+        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)} className="members-edit-modal">
           <IonHeader>
             <IonToolbar>
               <IonTitle>{isEditing ? 'Edit Member' : 'Add Member'}</IonTitle>
@@ -814,7 +815,8 @@ const MembersManagement: React.FC = () => {
                 </IonSelect>
               </IonItem>
             </IonList>
-
+          </IonContent>
+          <IonFooter>
             <div className="modal-actions">
               <IonButton expand="block" onClick={handleSaveMember} color="primary">
                 <IonIcon icon={checkmark} slot="start" />
@@ -824,11 +826,11 @@ const MembersManagement: React.FC = () => {
                 Cancel
               </IonButton>
             </div>
-          </IonContent>
+          </IonFooter>
         </IonModal>
 
         {/* Record Payment Modal */}
-        <IonModal isOpen={showPaymentModal} onDidDismiss={() => setShowPaymentModal(false)}>
+        <IonModal isOpen={showPaymentModal} onDidDismiss={() => setShowPaymentModal(false)} className="members-payment-modal">
           <IonHeader>
             <IonToolbar>
               <IonTitle>Record Payment</IonTitle>
@@ -894,29 +896,31 @@ const MembersManagement: React.FC = () => {
                     />
                   </IonItem>
                 </IonList>
-
-                <div className="modal-actions">
-                  <IonButton 
-                    expand="block" 
-                    onClick={handleSavePayment} 
-                    color="success"
-                    disabled={isSubmitting}
-                  >
-                    <IonIcon icon={checkmark} slot="start" />
-                    {isSubmitting ? 'Recording...' : `Record Payment (₱${paymentData.membershipPrice.toLocaleString()})`}
-                  </IonButton>
-                  <IonButton 
-                    expand="block" 
-                    fill="outline" 
-                    onClick={() => setShowPaymentModal(false)}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </IonButton>
-                </div>
               </>
             )}
           </IonContent>
+
+          <IonFooter>
+            <div className="modal-actions">
+              <IonButton
+                expand="block"
+                onClick={handleSavePayment}
+                color="success"
+                disabled={!selectedMemberForPayment || isSubmitting}
+              >
+                <IonIcon icon={checkmark} slot="start" />
+                {isSubmitting ? 'Recording...' : `Record Payment (₱${paymentData.membershipPrice.toLocaleString()})`}
+              </IonButton>
+              <IonButton
+                expand="block"
+                fill="outline"
+                onClick={() => setShowPaymentModal(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </IonButton>
+            </div>
+          </IonFooter>
         </IonModal>
       </IonContent>
     </IonPage>

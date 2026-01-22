@@ -275,6 +275,33 @@
   margin-bottom: 1rem;
 }
 
+/* ===== MODALS: ensure full scroll + reachable action buttons (desktop) ===== */
+ion-modal.members-edit-modal {
+  --width: min(720px, 96vw);
+  --height: min(92vh, 960px);
+}
+
+ion-modal.members-payment-modal {
+  --width: min(720px, 96vw);
+  --height: min(92vh, 960px);
+}
+
+ion-content.modal-content {
+  /* Reserve space so the last fields aren't hidden behind sticky footer */
+  --padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px) + 96px);
+}
+
+.modal-actions {
+  z-index: 10;
+  padding: 12px;
+  background: var(--ion-background-color, #121212);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-actions ion-button {
+  margin-top: 8px;
+}
+
 .payment-summary {
   background: var(--card-bg, #1e1e1e);
   padding: 1.5rem;
