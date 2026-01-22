@@ -224,9 +224,10 @@ const QrAttendance: React.FC = () => {
   };
 
   const handleQRCodeDetected = async (qrToken: string) => {
-    console.log("🔍 Processing QR Code:", qrToken);
-    
-    if (!qrToken.includes("ACTIVECORE_GYM")) {
+    const normalizedToken = typeof qrToken === 'string' ? qrToken.trim() : '';
+    console.log("🔍 Processing QR Code:", normalizedToken);
+
+    if (!normalizedToken) {
       setErrorMessage("❌ Invalid QR Code. Please scan the gym's attendance QR code.");
       setShowErrorAlert(true);
       return;
@@ -242,7 +243,7 @@ const QrAttendance: React.FC = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          qrToken: "ACTIVECORE_GYM_ATTENDANCE",
+          qrToken: normalizedToken,
           location: 'Main Gym'
         })
       });
@@ -251,15 +252,19 @@ const QrAttendance: React.FC = () => {
 
       if (data.success) {
         console.log("✅ Attendance recorded successfully!");
-        
-        setSuccessMessage(
-          `✅ Check-in Successful!\n\n` +
-          `📅 ${data.attendance.date}\n` +
-          `🕐 ${data.attendance.time}\n` +
-          `📍 ${data.attendance.location}\n\n` +
-          `Streak: 🔥 ${data.streak} days\n` +
-          `Total: 📊 ${data.totalAttendance} days`
-        );
+
+        if (data.attendance?.date && data.attendance?.time && data.attendance?.location) {
+          setSuccessMessage(
+            `✅ Check-in Successful!\n\n` +
+            `📅 ${data.attendance.date}\n` +
+            `🕐 ${data.attendance.time}\n` +
+            `📍 ${data.attendance.location}\n\n` +
+            `Streak: 🔥 ${data.streak ?? 0} days\n` +
+            `Total: 📊 ${data.totalAttendance ?? 0} days`
+          );
+        } else {
+          setSuccessMessage('✅ Check-in Successful!');
+        }
         
         setShowSuccessToast(true);
         

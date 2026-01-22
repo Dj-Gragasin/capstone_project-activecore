@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { pool } from '../config/db.config';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) 
  * Generate QR token for attendance
  * POST /api/admin/qr-token/generate
  */
-router.post('/generate', authenticateToken, (req: AuthRequest, res: Response<QRTokenResponse>) => {
+router.post('/generate', authenticateToken, async (req: AuthRequest, res: Response<QRTokenResponse>) => {
   try {
     // Validate user
     if (!req.user || !req.user.id) {
@@ -53,18 +54,33 @@ router.post('/generate', authenticateToken, (req: AuthRequest, res: Response<QRT
       });
     }
 
-    // Generate token
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
-    const token = `QR_${now.getTime()}_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const tokenId = Math.floor(Math.random() * 100000);
+    const expiresInHoursRaw = (req.body?.expiresInHours ?? 24) as any;
+    const expiresInHours = Number.isFinite(Number(expiresInHoursRaw)) && Number(expiresInHoursRaw) > 0
+      ? Number(expiresInHoursRaw)
+      : 24;
 
-    // Return success
+    const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000);
+
+    // Generate token (human-readable prefix helps debugging; validation is DB-backed)
+    const token = `ACTIVECORE_GYM_QR_${now.getTime()}_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+    // Deactivate any previous active tokens so only the latest QR works
+    await pool.query('UPDATE qr_attendance_tokens SET is_active = FALSE WHERE is_active = TRUE');
+
+    // Store token in DB
+    const [rows] = await pool.query<any>(
+      'INSERT INTO qr_attendance_tokens (token, expires_at, is_active, created_by) VALUES (?, ?, TRUE, ?) RETURNING id, token, expires_at',
+      [token, expiresAt.toISOString(), req.user.id]
+    );
+
+    const created = rows?.[0];
+
     return res.json({
       success: true,
-      token,
-      tokenId,
-      expiresAt: expiresAt.toISOString()
+      token: created?.token ?? token,
+      tokenId: created?.id,
+      expiresAt: created?.expires_at ? new Date(created.expires_at).toISOString() : expiresAt.toISOString(),
     });
 
   } catch (error: any) {

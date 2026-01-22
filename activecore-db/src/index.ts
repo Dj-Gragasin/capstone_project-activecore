@@ -1020,6 +1020,11 @@ app.get('/api/members', async (req, res) => {
     );
 
     
+    const normalizeMemberStatus = (raw: any): 'active' | 'inactive' => {
+      const s = String(raw ?? '').toLowerCase().trim();
+      return s === 'active' ? 'active' : 'inactive';
+    };
+
     const transformedMembers = members.map((member: any) => ({
       id: member.id,
       firstName: member.firstName || '',
@@ -1031,7 +1036,7 @@ app.get('/api/members', async (req, res) => {
       membershipType: member.membershipType || 'monthly',
       membershipPrice: parseFloat(member.membershipPrice) || 1500,
       joinDate: member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      status: member.status || 'active',
+      status: normalizeMemberStatus(member.status),
       paymentStatus: member.paymentStatus || 'pending',
       subscriptionStart: member.subscriptionStart ? new Date(member.subscriptionStart).toISOString().split('T')[0] : null,
       subscriptionEnd: member.subscriptionEnd ? new Date(member.subscriptionEnd).toISOString().split('T')[0] : null,
@@ -1157,58 +1162,65 @@ app.put('/api/members/:id', authenticateToken, async (req: AuthRequest, res: Res
       joinDate,
     } = req.body;
 
+    const hasText = (v: any) => typeof v === 'string' && v.trim() !== '';
+
 
     let updateFields = [];
     let updateValues = [];
 
-    if (firstName) {
+    if (hasText(firstName)) {
       updateFields.push('first_name = ?');
-      updateValues.push(firstName);
+      updateValues.push(firstName.trim());
     }
-    if (lastName) {
+    if (hasText(lastName)) {
       updateFields.push('last_name = ?');
-      updateValues.push(lastName);
+      updateValues.push(lastName.trim());
     }
-    if (email) {
+    if (hasText(email)) {
       updateFields.push('email = ?');
-      updateValues.push(email);
+      updateValues.push(email.trim());
     }
-    if (password) {
+    if (hasText(password)) {
       const hashedPassword = await bcrypt.hash(password, 12);
       updateFields.push('password = ?');
       updateValues.push(hashedPassword);
     }
-    if (phone) {
+    if (hasText(phone)) {
       updateFields.push('phone = ?');
-      updateValues.push(phone);
+      updateValues.push(phone.trim());
     }
-    if (gender) {
+    if (hasText(gender)) {
       updateFields.push('gender = ?');
-      updateValues.push(gender);
+      updateValues.push(gender.trim());
     }
-    if (dateOfBirth) {
+    if (hasText(dateOfBirth)) {
       updateFields.push('date_of_birth = ?');
-      updateValues.push(dateOfBirth);
+      updateValues.push(dateOfBirth.trim());
     }
-    if (membershipType) {
+    if (hasText(membershipType)) {
       updateFields.push('membership_type = ?');
-      updateValues.push(membershipType);
+      updateValues.push(membershipType.trim());
     }
-    if (membershipPrice) {
+    if (membershipPrice !== undefined && membershipPrice !== null && membershipPrice !== '') {
       updateFields.push('membership_price = ?');
       updateValues.push(membershipPrice);
     }
-    if (status) {
+    if (hasText(status)) {
       updateFields.push('status = ?');
-      updateValues.push(status);
+      updateValues.push(status.trim());
     }
-    if (emergencyContact !== undefined) {
+    // Blank strings mean "no change" (admin can update only the fields they type)
+    if (hasText(emergencyContact)) {
       updateFields.push('emergency_contact = ?');
-      updateValues.push(emergencyContact);
+      updateValues.push(emergencyContact.trim());
     }
-    if (address !== undefined) {
+    if (hasText(address)) {
       updateFields.push('address = ?');
-      updateValues.push(address);
+      updateValues.push(address.trim());
+    }
+    if (hasText(joinDate)) {
+      updateFields.push('join_date = ?');
+      updateValues.push(joinDate.trim());
     }
 
     if (updateFields.length === 0) {
@@ -2033,10 +2045,22 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
     const userId = req.user!.id;
     const { qrToken, location } = req.body;
 
-    // Validate QR token
-    if (!qrToken || !qrToken.includes("ACTIVECORE_GYM")) {
-      return res.status(400).json({ success: false, message: "Invalid QR code." });
+    const normalizedToken = typeof qrToken === 'string' ? qrToken.trim() : '';
+    if (!normalizedToken) {
+      return res.status(400).json({ success: false, message: 'Invalid QR code.' });
     }
+
+    // Validate QR token against DB (active + not expired)
+    const [tokenRows] = await pool.query<any>(
+      'SELECT id, token, expires_at, is_active FROM qr_attendance_tokens WHERE token = ? AND is_active = TRUE AND expires_at > NOW() LIMIT 1',
+      [normalizedToken]
+    );
+
+    if (!tokenRows || tokenRows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid QR code.' });
+    }
+
+    const tokenId = Number(tokenRows[0].id);
 
     // Prevent duplicate check-in for today
     const today = new Date();
@@ -2051,14 +2075,56 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
     }
 
     // Insert attendance record
-    await pool.query(
-      `INSERT INTO attendance (user_id, check_in_time, location, status) VALUES (?, NOW(), ?, 'present')`,
-      [userId, location || 'Main Gym']
+
+    const [inserted] = await pool.query<any>(
+      "INSERT INTO attendance (user_id, check_in_time, location, status, qr_token_id) VALUES (?, NOW(), ?, 'present', ?) RETURNING id, check_in_time, location, status",
+      [userId, location || 'Main Gym', tokenId]
     );
 
-    res.json({
+    const attendanceRow = inserted?.[0];
+    const checkInTimeStr = attendanceRow?.check_in_time
+      ? (attendanceRow.check_in_time instanceof Date ? attendanceRow.check_in_time.toISOString() : String(attendanceRow.check_in_time))
+      : new Date().toISOString();
+
+    // Total attendance count
+    const [countRows] = await pool.query<any>('SELECT COUNT(*)::int AS count FROM attendance WHERE user_id = ?', [userId]);
+    const totalAttendance = Number(countRows?.[0]?.count ?? 0);
+
+    // Streak based on distinct attendance days (consecutive days ending today)
+    const [dayRows] = await pool.query<any>(
+      'SELECT DISTINCT DATE(check_in_time) AS day FROM attendance WHERE user_id = ? ORDER BY day DESC LIMIT 120',
+      [userId]
+    );
+    const days: string[] = (dayRows || []).map((r: any) => String(r.day));
+    let streak = 0;
+    if (days.length > 0) {
+      let prev = new Date(days[0] + 'T00:00:00Z');
+      streak = 1;
+      for (let i = 1; i < days.length; i++) {
+        const current = new Date(days[i] + 'T00:00:00Z');
+        const diffDays = Math.round((prev.getTime() - current.getTime()) / (24 * 60 * 60 * 1000));
+        if (diffDays === 1) {
+          streak++;
+          prev = current;
+        } else {
+          break;
+        }
+      }
+    }
+
+    return res.json({
       success: true,
-      message: "Check-in successful."
+      message: 'Check-in successful.',
+      attendance: {
+        id: attendanceRow?.id,
+        checkInTime: checkInTimeStr,
+        date: checkInTimeStr.split('T')[0],
+        time: new Date(checkInTimeStr).toLocaleTimeString(),
+        location: attendanceRow?.location ?? (location || 'Main Gym'),
+        status: attendanceRow?.status ?? 'present',
+      },
+      streak,
+      totalAttendance,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: "Failed to record attendance." });

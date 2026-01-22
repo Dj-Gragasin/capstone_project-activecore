@@ -73,6 +73,7 @@ const MembersManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [originalMember, setOriginalMember] = useState<Member | null>(null);
   const [currentMember, setCurrentMember] = useState<Member>({
     firstName: '',
     lastName: '',
@@ -145,6 +146,7 @@ const MembersManagement: React.FC = () => {
 
   const handleAddMember = () => {
     setIsEditing(false);
+    setOriginalMember(null);
     setCurrentMember({
       firstName: '',
       lastName: '',
@@ -166,41 +168,109 @@ const MembersManagement: React.FC = () => {
 
   const handleEditMember = (member: Member) => {
     setIsEditing(true);
-    setCurrentMember({ ...member });
+    setOriginalMember({ ...member });
+    // Password should be optional on edit
+    setCurrentMember({ ...member, password: '' });
     setShowModal(true);
   };
 
-  const handleSaveMember = async () => {
-    if (
-      !currentMember.firstName ||
-      !currentMember.lastName ||
-      !currentMember.email ||
-      !currentMember.phone
-    ) {
-      presentToast({ message: 'Fill all required fields', duration: 2000, color: 'warning' });
+  const normalizeText = (value: any): string => String(value ?? '').trim();
+
+  const addIfChanged = (payload: any, key: keyof Member, value: any, original: any) => {
+    if (typeof value === 'string') {
+      const v = normalizeText(value);
+      const o = normalizeText(original);
+      if (v !== '' && v !== o) payload[key] = v;
       return;
     }
-    if (!isEditing && !currentMember.password) {
-      presentToast({ message: 'Password is required', duration: 2000, color: 'warning' });
+    if (typeof value === 'number') {
+      const v = Number(value);
+      const o = Number(original);
+      if (Number.isFinite(v) && v !== o) payload[key] = v;
       return;
+    }
+    if (value !== undefined && value !== original) payload[key] = value;
+  };
+
+  const handleSaveMember = async () => {
+    if (!isEditing) {
+      if (
+        !normalizeText(currentMember.firstName) ||
+        !normalizeText(currentMember.lastName) ||
+        !normalizeText(currentMember.email) ||
+        !normalizeText(currentMember.phone)
+      ) {
+        presentToast({ message: 'Fill all required fields', duration: 2000, color: 'warning' });
+        return;
+      }
+      if (!normalizeText(currentMember.password)) {
+        presentToast({ message: 'Password is required', duration: 2000, color: 'warning' });
+        return;
+      }
+    } else {
+      if (!currentMember.id) {
+        presentToast({ message: 'Missing member id', duration: 2000, color: 'danger' });
+        return;
+      }
+      if (!originalMember) {
+        presentToast({ message: 'Missing original member data', duration: 2000, color: 'danger' });
+        return;
+      }
     }
 
-    const payload: any = {
-      firstName: currentMember.firstName,
-      lastName: currentMember.lastName,
-      email: currentMember.email,
-      phone: currentMember.phone,
-      gender: currentMember.gender,
-      dateOfBirth: currentMember.dateOfBirth,
-      membershipType: currentMember.membershipType,
-      membershipPrice: currentMember.membershipPrice,
-      emergencyContact: currentMember.emergencyContact,
-      address: currentMember.address,
-      joinDate: currentMember.joinDate,
-      status: currentMember.status,
-    };
-    
-    if (currentMember.password) payload.password = currentMember.password;
+    const original = isEditing ? (originalMember as Member) : null;
+
+    const payload: any = {};
+
+    if (!isEditing) {
+      payload.firstName = normalizeText(currentMember.firstName);
+      payload.lastName = normalizeText(currentMember.lastName);
+      payload.email = normalizeText(currentMember.email);
+      payload.phone = normalizeText(currentMember.phone);
+      payload.gender = currentMember.gender;
+      payload.dateOfBirth = currentMember.dateOfBirth;
+      payload.membershipType = currentMember.membershipType;
+      payload.membershipPrice = currentMember.membershipPrice;
+      payload.emergencyContact = currentMember.emergencyContact;
+      payload.address = currentMember.address;
+      payload.joinDate = currentMember.joinDate;
+      payload.status = currentMember.status;
+      payload.password = normalizeText(currentMember.password);
+    } else {
+      // Partial update: only send changed fields; blank strings won't overwrite
+      addIfChanged(payload, 'firstName', currentMember.firstName, original!.firstName);
+      addIfChanged(payload, 'lastName', currentMember.lastName, original!.lastName);
+      addIfChanged(payload, 'email', currentMember.email, original!.email);
+      addIfChanged(payload, 'phone', currentMember.phone, original!.phone);
+
+      // Selects: send if changed (these are never blank)
+      if (currentMember.gender && currentMember.gender !== original!.gender) payload.gender = currentMember.gender;
+      if (currentMember.status && currentMember.status !== original!.status) payload.status = currentMember.status;
+
+      // Dates: send if changed AND not blank
+      addIfChanged(payload, 'dateOfBirth', currentMember.dateOfBirth, original!.dateOfBirth);
+      addIfChanged(payload, 'joinDate', currentMember.joinDate, original!.joinDate);
+
+      // Membership: if type changes, also send price
+      if (currentMember.membershipType && currentMember.membershipType !== original!.membershipType) {
+        payload.membershipType = currentMember.membershipType;
+        payload.membershipPrice = currentMember.membershipPrice;
+      } else {
+        // Allow price change alone if your UI ever supports it
+        addIfChanged(payload, 'membershipPrice', currentMember.membershipPrice, original!.membershipPrice);
+      }
+
+      addIfChanged(payload, 'emergencyContact', currentMember.emergencyContact, original!.emergencyContact);
+      addIfChanged(payload, 'address', currentMember.address, original!.address);
+
+      const pw = normalizeText(currentMember.password);
+      if (pw) payload.password = pw;
+
+      if (Object.keys(payload).length === 0) {
+        presentToast({ message: 'No changes to update', duration: 2000, color: 'warning' });
+        return;
+      }
+    }
 
     const url = isEditing ? `${API_URL}/members/${currentMember.id}` : `${API_URL}/members`;
     const method = isEditing ? 'PUT' : 'POST';
@@ -309,10 +379,9 @@ const MembersManagement: React.FC = () => {
         return 'success';
       case 'inactive':
         return 'warning';
-      case 'suspended':
-        return 'danger';
       default:
-        return 'medium';
+        // Any legacy/unknown status (e.g. 'suspended') should behave like inactive
+        return 'warning';
     }
   };
 
@@ -742,7 +811,6 @@ const MembersManagement: React.FC = () => {
                 >
                   <IonSelectOption value="active">Active</IonSelectOption>
                   <IonSelectOption value="inactive">Inactive</IonSelectOption>
-                  <IonSelectOption value="suspended">Suspended</IonSelectOption>
                 </IonSelect>
               </IonItem>
             </IonList>
