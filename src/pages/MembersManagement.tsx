@@ -584,17 +584,17 @@ const MembersManagement: React.FC = () => {
                       <IonCardHeader>
                         <div className="member-header">
                           <div className="member-avatar">
-                            {member.firstName.charAt(0).toUpperCase()}
-                            {member.lastName.charAt(0).toUpperCase()}
+                            <IonIcon icon={person} aria-hidden="true" />
                           </div>
                           <div className="member-info">
-                            <IonCardTitle>
-                              {member.firstName} {member.lastName}
+                            <IonCardTitle className="member-name">
+                              <span className="member-first-name">{member.firstName}</span>
+                              <span className="member-last-name">{member.lastName}</span>
                             </IonCardTitle>
                             <div className="member-badges">
-                              <IonBadge color={getStatusColor(member.status)}>{member.status}</IonBadge>
+                              <IonBadge color={getStatusColor(member.status)}>{String(member.status || '').toUpperCase()}</IonBadge>
                               <IonBadge color={getPaymentStatusColor(member.paymentStatus)}>
-                                {member.paymentStatus || 'pending'}
+                                {String(member.paymentStatus || 'pending').toUpperCase()}
                               </IonBadge>
                             </div>
                           </div>

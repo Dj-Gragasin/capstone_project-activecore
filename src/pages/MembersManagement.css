@@ -105,6 +105,21 @@
   flex: 1;
 }
 
+.member-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.member-first-name {
+  font-weight: 800;
+}
+
+.member-last-name {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
 .member-info ion-card-title {
   font-size: 1.2rem;
   margin-bottom: 0.5rem;
