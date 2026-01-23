@@ -2503,6 +2503,16 @@ app.get('/api/ping', (req: Request, res: Response) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
+app.get('/api/version', (req: Request, res: Response) => {
+  res.json({
+    ok: true,
+    service: process.env.RENDER_SERVICE_NAME || null,
+    commit: process.env.RENDER_GIT_COMMIT || null,
+    env: process.env.NODE_ENV || null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Test endpoints removed for production
 
 // ===== SERVER INITIALIZATION =====
