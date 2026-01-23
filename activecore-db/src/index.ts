@@ -2829,135 +2829,6 @@ app.post('/api/test/paypal', async (req: Request, res: Response) => {
   }
 });
 
-// App configuration
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-
-// Helper function to get PayPal access token
-async function getPayPalAccessToken(): Promise<string> {
-  try {
-    const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
-    
-    // Use Base64 encoding for auth header instead of axios auth
-    const credentials = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
-    
-    const response = await axios.post(
-      tokenUrl,
-      'grant_type=client_credentials',
-      {
-        headers: {
-          'Authorization': `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        timeout: 10000
-      }
-    );
-    
-    const tokenData = response.data as any;
-    return tokenData.access_token;
-  } catch (error: any) {
-    throw new Error('PayPal authentication failed: ' + (error.response?.data?.error_description || error.message));
-  }
-}
-
-// Create a PayPal order and return redirect URL
-app.post('/api/payments/paypal/create-order', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { amount, plan } = req.body;
-
-    // Validate input
-    if (!amount || !plan) {
-      return res.status(400).json({ success: false, message: 'Missing amount or plan' });
-    }
-    
-    if (!isValidAmount(amount)) {
-      return res.status(400).json({ success: false, message: 'Invalid payment amount' });
-    }
-
-    const accessToken = await getPayPalAccessToken();
-
-    const planDescription = plan === 'monthly' ? 'Monthly Membership' : 
-                           plan === 'quarterly' ? 'Quarterly Membership' :
-                           'Annual Membership';
-
-    const payload = {
-      intent: 'CAPTURE',
-      payer: {
-        email_address: `user_${userId}@activecore.test`
-      },
-      purchase_units: [{
-        amount: {
-          currency_code: 'PHP',
-          value: String(amount)
-        },
-        description: planDescription,
-        custom_id: `${userId}|${plan}` // Store userId and plan in custom_id
-      }],
-      application_context: {
-        brand_name: 'ActiveCore Fitness',
-        landing_page: 'BILLING',
-        user_action: 'PAY_NOW',
-        return_url: `${APP_URL}/member/payment/success`,
-        cancel_url: `${APP_URL}/member/payment/cancel`
-      }
-    };
-
-    const response = await axios.post(`${PAYPAL_API_URL}/checkout/orders`, payload, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 10000 // 10 second timeout
-    });
-
-    const responseData = response.data as any;
-    const orderId = responseData.id;
-    const approvalLink = responseData.links?.find((link: any) => link.rel === 'approve')?.href;
-
-    if (!orderId || !approvalLink) {
-      return res.status(500).json({ success: false, message: 'Failed to create payment order' });
-    }
-
-    // Insert payment record (pending)
-    await pool.query(
-      `INSERT INTO payments (user_id, amount, payment_method, membership_type, payment_status, transaction_id, created_at)
-         VALUES (?, ?, 'paypal', ?, 'pending', ?, NOW())`,
-      [userId, Number(amount), plan, orderId]
-    );
-
-    res.json({ success: true, approvalLink, orderId });
-  } catch (err: any) {
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const errorCode = err.response?.status || 500;
-    
-    // Log error without exposing sensitive details
-    if (isDevelopment) {
-    } else {
-    }
-    
-    // Safe error message for client
-    const clientMessage = errorCode === 401 || errorCode === 403
-      ? 'Payment service authentication failed. Please contact support.'
-      : errorCode >= 400 && errorCode < 500
-      ? 'Invalid payment request. Please check your details and try again.'
-      : 'Payment service temporarily unavailable. Please try again later.';
-    
-    res.status(500).json({ 
-      success: false, 
-      message: clientMessage,
-      ...(isDevelopment && { debug: err.response?.data })
-    });
-  }
-});
-
-// Capture PayPal order and update subscription
-app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { orderId } = req.body;
-
-    if (!orderId) {
-
 // ==================== EQUIPMENT ROUTES (ADMIN) ====================
 
 type EquipmentRow = {
@@ -3102,6 +2973,135 @@ app.delete('/api/equipment/:id', authenticateToken, requireAdmin, async (req: Au
     res.status(500).json({ success: false, message: 'Failed to delete equipment', error: getErrorMessage(err) });
   }
 });
+
+// App configuration
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+
+// Helper function to get PayPal access token
+async function getPayPalAccessToken(): Promise<string> {
+  try {
+    const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
+    
+    // Use Base64 encoding for auth header instead of axios auth
+    const credentials = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+    
+    const response = await axios.post(
+      tokenUrl,
+      'grant_type=client_credentials',
+      {
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 10000
+      }
+    );
+    
+    const tokenData = response.data as any;
+    return tokenData.access_token;
+  } catch (error: any) {
+    throw new Error('PayPal authentication failed: ' + (error.response?.data?.error_description || error.message));
+  }
+}
+
+// Create a PayPal order and return redirect URL
+app.post('/api/payments/paypal/create-order', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { amount, plan } = req.body;
+
+    // Validate input
+    if (!amount || !plan) {
+      return res.status(400).json({ success: false, message: 'Missing amount or plan' });
+    }
+    
+    if (!isValidAmount(amount)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment amount' });
+    }
+
+    const accessToken = await getPayPalAccessToken();
+
+    const planDescription = plan === 'monthly' ? 'Monthly Membership' : 
+                           plan === 'quarterly' ? 'Quarterly Membership' :
+                           'Annual Membership';
+
+    const payload = {
+      intent: 'CAPTURE',
+      payer: {
+        email_address: `user_${userId}@activecore.test`
+      },
+      purchase_units: [{
+        amount: {
+          currency_code: 'PHP',
+          value: String(amount)
+        },
+        description: planDescription,
+        custom_id: `${userId}|${plan}` // Store userId and plan in custom_id
+      }],
+      application_context: {
+        brand_name: 'ActiveCore Fitness',
+        landing_page: 'BILLING',
+        user_action: 'PAY_NOW',
+        return_url: `${APP_URL}/member/payment/success`,
+        cancel_url: `${APP_URL}/member/payment/cancel`
+      }
+    };
+
+    const response = await axios.post(`${PAYPAL_API_URL}/checkout/orders`, payload, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000 // 10 second timeout
+    });
+
+    const responseData = response.data as any;
+    const orderId = responseData.id;
+    const approvalLink = responseData.links?.find((link: any) => link.rel === 'approve')?.href;
+
+    if (!orderId || !approvalLink) {
+      return res.status(500).json({ success: false, message: 'Failed to create payment order' });
+    }
+
+    // Insert payment record (pending)
+    await pool.query(
+      `INSERT INTO payments (user_id, amount, payment_method, membership_type, payment_status, transaction_id, created_at)
+         VALUES (?, ?, 'paypal', ?, 'pending', ?, NOW())`,
+      [userId, Number(amount), plan, orderId]
+    );
+
+    res.json({ success: true, approvalLink, orderId });
+  } catch (err: any) {
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const errorCode = err.response?.status || 500;
+    
+    // Log error without exposing sensitive details
+    if (isDevelopment) {
+    } else {
+    }
+    
+    // Safe error message for client
+    const clientMessage = errorCode === 401 || errorCode === 403
+      ? 'Payment service authentication failed. Please contact support.'
+      : errorCode >= 400 && errorCode < 500
+      ? 'Invalid payment request. Please check your details and try again.'
+      : 'Payment service temporarily unavailable. Please try again later.';
+    
+    res.status(500).json({ 
+      success: false, 
+      message: clientMessage,
+      ...(isDevelopment && { debug: err.response?.data })
+    });
+  }
+});
+
+// Capture PayPal order and update subscription
+app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { orderId } = req.body;
+
+    if (!orderId) {
       return res.status(400).json({ success: false, message: 'Missing orderId' });
     }
 
