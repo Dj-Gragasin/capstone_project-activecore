@@ -313,6 +313,120 @@ async function ensureEquipmentTable() {
   }
 }
 
+async function ensureMuscleGainRecordsTable() {
+  // Prefer PostgreSQL DDL (this backend uses `pg` behind a MySQL-placeholder wrapper).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS muscle_gain_records (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, record_date)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_muscle_gain_user_date ON muscle_gain_records(user_id, record_date)`);
+    return;
+  } catch (err: any) {
+    // fall through
+  }
+
+  // MySQL fallback for local setups.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS muscle_gain_records (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        data JSON NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW(),
+        UNIQUE KEY uniq_muscle_gain_user_date (user_id, record_date),
+        INDEX idx_muscle_gain_user_date (user_id, record_date)
+      )
+    `);
+  } catch (err: any) {
+    logWarn('Failed to ensure muscle_gain_records table', err?.message || String(err));
+  }
+}
+
+async function ensureProgressRecordsTable() {
+  // Prefer PostgreSQL DDL (this backend uses `pg` behind a MySQL-placeholder wrapper).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS progress_records (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_progress_user_date ON progress_records(user_id, record_date)`);
+    return;
+  } catch (err: any) {
+    // fall through
+  }
+
+  // MySQL fallback for local setups.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS progress_records (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        data JSON NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW(),
+        INDEX idx_progress_user_date (user_id, record_date)
+      )
+    `);
+  } catch (err: any) {
+    logWarn('Failed to ensure progress_records table', err?.message || String(err));
+  }
+}
+
+async function ensureAbsenceReminderSettingsTable() {
+  // Stores per-user reminder settings so they sync across devices.
+  // Prefer PostgreSQL DDL (this backend uses `pg` behind a MySQL-placeholder wrapper).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_absence_reminder_settings (
+        user_id INT PRIMARY KEY,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        threshold_days INT NOT NULL DEFAULT 3,
+        reminder_hour INT NOT NULL DEFAULT 8,
+        reminder_minute INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    return;
+  } catch (err: any) {
+    // fall through
+  }
+
+  // MySQL fallback for local setups.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_absence_reminder_settings (
+        user_id INT PRIMARY KEY,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        threshold_days INT NOT NULL DEFAULT 3,
+        reminder_hour INT NOT NULL DEFAULT 8,
+        reminder_minute INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (err: any) {
+    logWarn('Failed to ensure user_absence_reminder_settings table', err?.message || String(err));
+  }
+}
+
 // ===== HELPER FUNCTIONS =====
 
 // Add rice/carb sides to lunch and dinner meals
@@ -2480,6 +2594,281 @@ app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
 });
 
 // ============================================
+// USER SETTINGS: Absence reminder (per-user)
+// ============================================
+
+app.get('/api/user/settings/absence-reminder', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const [rows] = await pool.query<any>(
+      'SELECT enabled, threshold_days, reminder_hour, reminder_minute FROM user_absence_reminder_settings WHERE user_id = ? LIMIT 1',
+      [userId]
+    );
+
+    const row = rows?.[0];
+    if (!row) {
+      return res.json({
+        success: true,
+        settings: { enabled: true, thresholdDays: 3, reminderHour: 8, reminderMinute: 0 },
+      });
+    }
+
+    res.json({
+      success: true,
+      settings: {
+        enabled: row.enabled === true || row.enabled === 1 || row.enabled === '1',
+        thresholdDays: Number(row.threshold_days) || 3,
+        reminderHour: Number(row.reminder_hour) || 8,
+        reminderMinute: Number(row.reminder_minute) || 0,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to load absence reminder settings.' });
+  }
+});
+
+app.post('/api/user/settings/absence-reminder', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const enabled = Boolean(req.body?.enabled);
+    const thresholdDays = Math.max(1, Number(req.body?.thresholdDays ?? 3));
+    const reminderHour = Math.min(23, Math.max(0, Number(req.body?.reminderHour ?? 8)));
+    const reminderMinute = Math.min(59, Math.max(0, Number(req.body?.reminderMinute ?? 0)));
+
+    // Prefer PostgreSQL upsert.
+    try {
+      await pool.query(
+        `INSERT INTO user_absence_reminder_settings (user_id, enabled, threshold_days, reminder_hour, reminder_minute, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET enabled = EXCLUDED.enabled, threshold_days = EXCLUDED.threshold_days, reminder_hour = EXCLUDED.reminder_hour, reminder_minute = EXCLUDED.reminder_minute, updated_at = NOW()`,
+        [userId, enabled, thresholdDays, reminderHour, reminderMinute]
+      );
+    } catch (e: any) {
+      // MySQL fallback.
+      await pool.query(
+        `INSERT INTO user_absence_reminder_settings (user_id, enabled, threshold_days, reminder_hour, reminder_minute, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), threshold_days = VALUES(threshold_days), reminder_hour = VALUES(reminder_hour), reminder_minute = VALUES(reminder_minute), updated_at = NOW()`,
+        [userId, enabled ? 1 : 0, thresholdDays, reminderHour, reminderMinute]
+      );
+    }
+
+    res.json({
+      success: true,
+      settings: { enabled, thresholdDays, reminderHour, reminderMinute },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to save absence reminder settings.' });
+  }
+});
+
+// ============================================
+// MUSCLE GAIN TRACKER (per-user, server-synced)
+// ============================================
+
+app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const [rows] = await pool.query<any>(
+      'SELECT record_date, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC',
+      [userId]
+    );
+
+    const records = (rows || []).map((r: any) => {
+      const recordDate = r.record_date instanceof Date
+        ? r.record_date.toISOString().slice(0, 10)
+        : String(r.record_date || '').slice(0, 10);
+
+      let data: any = r.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { data = {}; }
+      }
+
+      // Always return with a canonical `date` field.
+      return { date: recordDate, ...(data || {}) };
+    });
+
+    res.json({ success: true, records });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to load muscle gain records.' });
+  }
+});
+
+app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { date, measurements, strengthStats, proteinIntake, notes } = req.body || {};
+
+    if (!date || !measurements || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
+      return res.status(400).json({ success: false, message: 'Missing required fields.' });
+    }
+
+    const recordDate = String(date).slice(0, 10);
+    const payload = {
+      measurements,
+      strengthStats,
+      proteinIntake: Number(proteinIntake),
+      notes: typeof notes === 'string' ? notes : '',
+    };
+
+    // Prefer PostgreSQL upsert.
+    try {
+      await pool.query(
+        `INSERT INTO muscle_gain_records (user_id, record_date, data, created_at, updated_at)
+         VALUES (?, ?, ?::jsonb, NOW(), NOW())
+         ON CONFLICT (user_id, record_date)
+         DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+        [userId, recordDate, JSON.stringify(payload)]
+      );
+    } catch (e: any) {
+      // MySQL fallback.
+      await pool.query(
+        `INSERT INTO muscle_gain_records (user_id, record_date, data, created_at, updated_at)
+         VALUES (?, ?, ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = NOW()`,
+        [userId, recordDate, JSON.stringify(payload)]
+      );
+    }
+
+    // Return the updated list for the chart.
+    const [rows] = await pool.query<any>(
+      'SELECT record_date, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC',
+      [userId]
+    );
+    const records = (rows || []).map((r: any) => {
+      const d = r.record_date instanceof Date ? r.record_date.toISOString().slice(0, 10) : String(r.record_date || '').slice(0, 10);
+      let data: any = r.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { data = {}; }
+      }
+      return { date: d, ...(data || {}) };
+    });
+
+    res.json({ success: true, records });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to save muscle gain record.' });
+  }
+});
+
+app.delete('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    await pool.query('DELETE FROM muscle_gain_records WHERE user_id = ?', [userId]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete muscle gain records.' });
+  }
+});
+
+// ============================================
+// PROGRESS TRACKER (per-user, server-synced)
+// ============================================
+
+app.get('/api/progress/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const [rows] = await pool.query<any>(
+      'SELECT id, record_date, data FROM progress_records WHERE user_id = ? ORDER BY record_date ASC, id ASC',
+      [userId]
+    );
+
+    const records = (rows || []).map((r: any) => {
+      const recordDate = r.record_date instanceof Date
+        ? r.record_date.toISOString().slice(0, 10)
+        : String(r.record_date || '').slice(0, 10);
+
+      let data: any = r.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { data = {}; }
+      }
+
+      return { id: r.id, date: recordDate, ...(data || {}) };
+    });
+
+    res.json({ success: true, records });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to load progress records.' });
+  }
+});
+
+app.post('/api/progress/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { date, weight, bmi, notes } = req.body || {};
+
+    if (!date || weight === undefined || weight === null || bmi === undefined || bmi === null) {
+      return res.status(400).json({ success: false, message: 'Missing required fields.' });
+    }
+
+    const recordDate = String(date).slice(0, 10);
+    const payload = {
+      weight: Number(weight),
+      bmi: Number(bmi),
+      notes: typeof notes === 'string' ? notes : '',
+    };
+
+    // Insert only (allow multiple entries per date if user wants).
+    try {
+      await pool.query(
+        `INSERT INTO progress_records (user_id, record_date, data, created_at, updated_at)
+         VALUES (?, ?, ?::jsonb, NOW(), NOW())`,
+        [userId, recordDate, JSON.stringify(payload)]
+      );
+    } catch (e: any) {
+      await pool.query(
+        `INSERT INTO progress_records (user_id, record_date, data, created_at, updated_at)
+         VALUES (?, ?, ?, NOW(), NOW())`,
+        [userId, recordDate, JSON.stringify(payload)]
+      );
+    }
+
+    const [rows] = await pool.query<any>(
+      'SELECT id, record_date, data FROM progress_records WHERE user_id = ? ORDER BY record_date ASC, id ASC',
+      [userId]
+    );
+
+    const records = (rows || []).map((r: any) => {
+      const d = r.record_date instanceof Date ? r.record_date.toISOString().slice(0, 10) : String(r.record_date || '').slice(0, 10);
+      let data: any = r.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { data = {}; }
+      }
+      return { id: r.id, date: d, ...(data || {}) };
+    });
+
+    res.json({ success: true, records });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to save progress record.' });
+  }
+});
+
+app.delete('/api/progress/records', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    await pool.query('DELETE FROM progress_records WHERE user_id = ?', [userId]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete progress records.' });
+  }
+});
+
+app.delete('/api/progress/records/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid id.' });
+    }
+
+    await pool.query('DELETE FROM progress_records WHERE id = ? AND user_id = ?', [id, userId]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete progress record.' });
+  }
+});
+
+// ============================================
 // ERROR HANDLING MIDDLEWARE
 // ============================================
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -2570,6 +2959,27 @@ async function initialize() {
 (async function ensureEquipmentTableAtStartup() {
   try {
     await ensureEquipmentTable();
+  } catch (err) {
+  }
+})();
+
+(async function ensureMuscleGainTableAtStartup() {
+  try {
+    await ensureMuscleGainRecordsTable();
+  } catch (err) {
+  }
+})();
+
+(async function ensureProgressTableAtStartup() {
+  try {
+    await ensureProgressRecordsTable();
+  } catch (err) {
+  }
+})();
+
+(async function ensureAbsenceReminderSettingsTableAtStartup() {
+  try {
+    await ensureAbsenceReminderSettingsTable();
   } catch (err) {
   }
 })();

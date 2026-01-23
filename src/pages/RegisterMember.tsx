@@ -26,7 +26,10 @@ import {
 import Chart from 'chart.js/auto';
 
 import './RegisterMember.css';
+import { API_CONFIG } from '../config/api.config';
 import { logout } from '../services/auth.service';
+
+const API_URL = API_CONFIG.BASE_URL;
 
 type MemberProfile = {
   memberName: string;
@@ -35,27 +38,37 @@ type MemberProfile = {
   memberSince: string;
   nextPayment: string;
   totalWorkouts: string;
-  avgDuration: string;
-  calories: string;
   attendanceRate: string;
+};
+
+type SubscriptionInfo = {
+  membershipType?: string | null;
+  membershipPrice?: number | null;
+  subscriptionStart?: string | null;
+  subscriptionEnd?: string | null;
+  paymentStatus?: string | null;
+  status?: string | null;
 };
 
 const RegisterMember: React.FC = () => {
   const router = useIonRouter();
 
   const [profile, setProfile] = useState<MemberProfile>({
-    memberName: 'John Doe',
-    memberEmail: 'john.doe@email.com',
-    plan: 'Standard Plan',
-    memberSince: 'Jan 2024',
-    nextPayment: 'Oct 2025',
-    totalWorkouts: '12',
-    avgDuration: '45 mins',
-    calories: '3000',
-    attendanceRate: '85%',
+    memberName: 'Member',
+    memberEmail: '—',
+    plan: '—',
+    memberSince: '—',
+    nextPayment: '—',
+    totalWorkouts: '—',
+    attendanceRate: '—',
   });
 
-  const membershipProgress = 0.75;
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [authRequired, setAuthRequired] = useState(false);
+
+  const [membershipProgress, setMembershipProgress] = useState(0.75);
+  const [membershipStatus, setMembershipStatus] = useState('Active');
+  const [paymentStatus, setPaymentStatus] = useState('Paid');
 
   const workoutCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fitnessCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -75,17 +88,134 @@ const RegisterMember: React.FC = () => {
   );
 
   useEffect(() => {
-    setProfile({
-      memberName: localStorage.getItem('memberName') || 'John Doe',
-      memberEmail: localStorage.getItem('memberEmail') || 'john.doe@email.com',
-      plan: localStorage.getItem('memberPlan') || 'Standard Plan',
-      memberSince: localStorage.getItem('membershipSince') || 'Jan 2024',
-      nextPayment: localStorage.getItem('nextPayment') || 'Oct 2025',
-      totalWorkouts: localStorage.getItem('totalWorkouts') || '12',
-      avgDuration: localStorage.getItem('avgDuration') || '45 mins',
-      calories: localStorage.getItem('caloriesBurned') || '3000',
-      attendanceRate: localStorage.getItem('attendanceRate') || '85%',
-    });
+    const resetToUnknown = () => {
+      setProfile({
+        memberName: 'Member',
+        memberEmail: '—',
+        plan: '—',
+        memberSince: '—',
+        nextPayment: '—',
+        totalWorkouts: '—',
+        attendanceRate: '—',
+      });
+      setMembershipProgress(0);
+      setMembershipStatus('—');
+      setPaymentStatus('—');
+    };
+
+    const toDisplayMonthYear = (iso: string | null | undefined) => {
+      if (!iso) return '';
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return '';
+      return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(date);
+    };
+
+    const computeProgress = (startIso: string | null | undefined, endIso: string | null | undefined) => {
+      if (!startIso || !endIso) return 0.75;
+      const start = new Date(startIso);
+      const end = new Date(endIso);
+      const now = new Date();
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
+        return 0.75;
+      }
+      const pct = (now.getTime() - start.getTime()) / (end.getTime() - start.getTime());
+      return Math.max(0, Math.min(1, pct));
+    };
+
+    const loadFromApi = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setAuthRequired(true);
+        setLoadingProfile(false);
+        resetToUnknown();
+        return;
+      }
+
+      setAuthRequired(false);
+      setLoadingProfile(true);
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      try {
+        const [userRes, subRes, attRes] = await Promise.all([
+          fetch(`${API_URL}/user/profile`, { headers }),
+          fetch(`${API_URL}/member/subscription`, { headers }),
+          fetch(`${API_URL}/attendance/history`, { headers }),
+        ]);
+
+        let memberName = '';
+        let memberEmail = '';
+        if (!userRes.ok) {
+          throw new Error(`Failed to load profile (${userRes.status})`);
+        }
+
+        const userData = await userRes.json();
+        const user = userData?.user;
+        if (!userData?.success || !user) {
+          throw new Error('Invalid profile response');
+        }
+
+        memberEmail = user.email || '';
+        memberName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+
+        let subscription: SubscriptionInfo = {};
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          subscription = subData || {};
+        }
+
+        const membershipType = subscription.membershipType || '';
+        const plan = membershipType
+          ? membershipType.charAt(0).toUpperCase() + membershipType.slice(1)
+          : 'Standard Plan';
+
+        const memberSince = toDisplayMonthYear(subscription.subscriptionStart) || '—';
+        const nextPayment = toDisplayMonthYear(subscription.subscriptionEnd) || '—';
+
+        const serverPaymentStatus = (subscription.paymentStatus || '').toString();
+        setPaymentStatus(serverPaymentStatus ? serverPaymentStatus.toUpperCase() : '—');
+
+        const serverMembershipStatus = (subscription.status || '').toString();
+        setMembershipStatus(serverMembershipStatus ? serverMembershipStatus.toUpperCase() : '—');
+
+        setMembershipProgress(computeProgress(subscription.subscriptionStart, subscription.subscriptionEnd));
+
+        let totalWorkouts = '—';
+        let attendanceRate = '—';
+        if (attRes.ok) {
+          const attData = await attRes.json();
+          if (attData?.success) {
+            totalWorkouts = String(attData?.stats?.totalAttendance ?? 0);
+
+            const attendance: Array<{ checkInTime: string }> = Array.isArray(attData.attendance) ? attData.attendance : [];
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 29);
+            const attendedIn30Days = attendance.filter(r => {
+              const d = new Date(r.checkInTime);
+              return !Number.isNaN(d.getTime()) && d >= cutoff;
+            }).length;
+            const pct = Math.round((attendedIn30Days / 30) * 100);
+            attendanceRate = `${pct}% (30d)`;
+          }
+        }
+
+        setProfile({
+          memberName: memberName || memberEmail || 'Member',
+          memberEmail: memberEmail || '—',
+          plan,
+          memberSince,
+          nextPayment,
+          totalWorkouts,
+          attendanceRate,
+        });
+      } catch (e) {
+        resetToUnknown();
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    loadFromApi();
   }, []);
 
   useEffect(() => {
@@ -151,6 +281,10 @@ const RegisterMember: React.FC = () => {
     router.push('/home', 'root', 'replace');
   };
 
+  const handleGoToLogin = () => {
+    router.push('/home', 'root', 'replace');
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -160,7 +294,11 @@ const RegisterMember: React.FC = () => {
           </IonButtons>
           <IonTitle>Member Profile</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={handleLogout}>Logout</IonButton>
+            {localStorage.getItem('token') ? (
+              <IonButton onClick={handleLogout}>Logout</IonButton>
+            ) : (
+              <IonButton onClick={handleGoToLogin}>Login</IonButton>
+            )}
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -177,9 +315,26 @@ const RegisterMember: React.FC = () => {
                   </IonCardHeader>
 
                   <IonCardContent>
+                    {authRequired ? (
+                      <div style={{ padding: '0.5rem 0' }}>
+                        <IonText color="medium">
+                          Please log in to view your profile.
+                        </IonText>
+                        <div style={{ marginTop: '1rem' }}>
+                          <IonButton expand="block" onClick={handleGoToLogin}>
+                            Go to Login
+                          </IonButton>
+                        </div>
+                      </div>
+                    ) : loadingProfile ? (
+                      <div style={{ padding: '0.5rem 0' }}>
+                        <IonText color="medium">Loading profile...</IonText>
+                      </div>
+                    ) : null}
+
                     <div className="membership-header">
                       <h3>Membership Status</h3>
-                      <span className="status-badge status-active">Active</span>
+                      <span className="status-badge status-active">{membershipStatus}</span>
                     </div>
 
                     <IonProgressBar value={membershipProgress} className="membership-progress" />
@@ -206,7 +361,7 @@ const RegisterMember: React.FC = () => {
                       <IonItem className="membership-meta-item">
                         <IonLabel>
                           <div className="meta-label">Payment Status</div>
-                          <div className="text-success">Paid</div>
+                          <div className="text-success">{paymentStatus}</div>
                         </IonLabel>
                       </IonItem>
                     </IonList>
@@ -240,19 +395,7 @@ const RegisterMember: React.FC = () => {
                         <IonCol size="6" sizeMd="3">
                           <div className="stat-card">
                             <div className="stat-value">{profile.totalWorkouts}</div>
-                            <div className="stat-label">Total Workouts</div>
-                          </div>
-                        </IonCol>
-                        <IonCol size="6" sizeMd="3">
-                          <div className="stat-card">
-                            <div className="stat-value">{profile.avgDuration}</div>
-                            <div className="stat-label">Avg. Duration</div>
-                          </div>
-                        </IonCol>
-                        <IonCol size="6" sizeMd="3">
-                          <div className="stat-card">
-                            <div className="stat-value">{profile.calories}</div>
-                            <div className="stat-label">Calories Burned</div>
+                            <div className="stat-label">Total Check-ins</div>
                           </div>
                         </IonCol>
                         <IonCol size="6" sizeMd="3">

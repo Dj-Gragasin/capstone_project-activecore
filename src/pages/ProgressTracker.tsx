@@ -33,6 +33,9 @@ import {
 import { Line } from 'react-chartjs-2';
 import { calendar, analytics } from 'ionicons/icons';
 import './ProgressTracker.css';
+import { API_CONFIG } from '../config/api.config';
+
+const API_URL = API_CONFIG.BASE_URL;
 
 ChartJS.register(
   CategoryScale,
@@ -45,6 +48,7 @@ ChartJS.register(
 );
 
 interface ProgressRecord {
+  id?: number;
   date: string;
   weight: number;
   bmi: number;
@@ -58,11 +62,36 @@ const ProgressTracker: React.FC = () => {
   const [bmi, setBmi] = useState('');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    const stored = localStorage.getItem('progressRecords');
-    if (stored) {
-      setRecords(JSON.parse(stored));
+  const loadRecords = async () => {
+    const token = localStorage.getItem('token') || '';
+
+    // If not logged in, fall back to local-only storage.
+    if (!token) {
+      const stored = localStorage.getItem('progressRecords');
+      if (stored) setRecords(JSON.parse(stored));
+      return;
     }
+
+    try {
+      const res = await fetch(`${API_URL}/progress/records`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || 'Failed to load records');
+      }
+      const nextRecords = Array.isArray(data.records) ? data.records : [];
+      setRecords(nextRecords);
+      // keep a local cache as a fallback for offline mode
+      localStorage.setItem('progressRecords', JSON.stringify(nextRecords));
+    } catch (err) {
+      const stored = localStorage.getItem('progressRecords');
+      if (stored) setRecords(JSON.parse(stored));
+    }
+  };
+
+  useEffect(() => {
+    loadRecords();
   }, []);
 
   const handleUpdate = () => {
@@ -82,9 +111,41 @@ const ProgressTracker: React.FC = () => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    setRecords(updatedRecords);
-    localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));
-    clearForm();
+    // Persist to server when logged in; otherwise local-only.
+    const token = localStorage.getItem('token') || '';
+    if (!token) {
+      setRecords(updatedRecords);
+      localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));
+      clearForm();
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/progress/records`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(newRecord),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message || 'Failed to save record');
+        }
+
+        const nextRecords = Array.isArray(data.records) ? data.records : updatedRecords;
+        setRecords(nextRecords);
+        localStorage.setItem('progressRecords', JSON.stringify(nextRecords));
+        clearForm();
+      } catch (e: any) {
+        setRecords(updatedRecords);
+        localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));
+        clearForm();
+        alert(`Saved locally only (server sync failed): ${e?.message || 'unknown error'}`);
+      }
+    })();
   };
 
   const clearForm = () => {
@@ -96,14 +157,62 @@ const ProgressTracker: React.FC = () => {
 
   const handleDeleteAll = () => {
     if (window.confirm('Are you sure you want to delete all records?')) {
-      setRecords([]);
-      localStorage.removeItem('progressRecords');
-      clearForm();
+      const token = localStorage.getItem('token') || '';
+      if (!token) {
+        setRecords([]);
+        localStorage.removeItem('progressRecords');
+        clearForm();
+        return;
+      }
+
+      (async () => {
+        try {
+          const res = await fetch(`${API_URL}/progress/records`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok || !data?.success) {
+            throw new Error(data?.message || 'Failed to delete records');
+          }
+          setRecords([]);
+          localStorage.removeItem('progressRecords');
+          clearForm();
+        } catch (e: any) {
+          alert(`Failed to delete from server: ${e?.message || 'unknown error'}`);
+        }
+      })();
     }
   };
 
   const handleDeleteRecord = (index: number) => {
     if (window.confirm('Delete this record?')) {
+      const token = localStorage.getItem('token') || '';
+      const record = records[index];
+
+      // If server-backed record (has id) and logged in, delete on server.
+      if (token && record?.id) {
+        (async () => {
+          try {
+            const res = await fetch(`${API_URL}/progress/records/${record.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok || !data?.success) {
+              throw new Error(data?.message || 'Failed to delete record');
+            }
+            const updatedRecords = records.filter((_, i) => i !== index);
+            setRecords(updatedRecords);
+            localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));
+          } catch (e: any) {
+            alert(`Failed to delete from server: ${e?.message || 'unknown error'}`);
+          }
+        })();
+        return;
+      }
+
+      // Local-only fallback.
       const updatedRecords = records.filter((_, i) => i !== index);
       setRecords(updatedRecords);
       localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));

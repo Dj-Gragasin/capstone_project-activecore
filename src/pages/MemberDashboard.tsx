@@ -79,6 +79,71 @@ const MemberDashboard: React.FC = () => {
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
   const router = useIonRouter();
 
+  const persistAbsenceReminderSettings = useCallback(async (next: {
+    enabled: boolean;
+    thresholdDays: number;
+    reminderHour: number;
+    reminderMinute: number;
+  }) => {
+    // Always keep local cache so settings work offline.
+    localStorage.setItem('absenceReminderEnabled', String(next.enabled));
+    localStorage.setItem('absenceReminderThresholdDays', String(next.thresholdDays));
+    localStorage.setItem('absenceReminderHour', String(next.reminderHour));
+    localStorage.setItem('absenceReminderMinute', String(next.reminderMinute));
+
+    const token = localStorage.getItem('token') || '';
+    if (!token) return;
+
+    try {
+      await fetch(`${API_URL}/user/settings/absence-reminder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(next),
+      });
+    } catch {
+      // ignore: offline / backend unreachable
+    }
+  }, []);
+
+  const loadAbsenceReminderSettings = useCallback(async () => {
+    const token = localStorage.getItem('token') || '';
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/user/settings/absence-reminder`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.settings) return;
+
+      const s = data.settings;
+      const enabled = Boolean(s.enabled);
+      const nextThresholdDays = Number(s.thresholdDays);
+      const hour = Number(s.reminderHour);
+      const minute = Number(s.reminderMinute);
+
+      const normalized = {
+        enabled,
+        thresholdDays: Number.isFinite(nextThresholdDays) && nextThresholdDays > 0 ? nextThresholdDays : DEFAULT_ABSENCE_THRESHOLD_DAYS,
+        reminderHour: Number.isFinite(hour) && hour >= 0 && hour <= 23 ? hour : DEFAULT_REMINDER_HOUR,
+        reminderMinute: Number.isFinite(minute) && minute >= 0 && minute <= 59 ? minute : DEFAULT_REMINDER_MINUTE,
+      };
+
+      setReminderEnabled(normalized.enabled);
+      setThresholdDays(normalized.thresholdDays);
+      setReminderHour(normalized.reminderHour);
+      setReminderMinute(normalized.reminderMinute);
+
+      // Update local cache to match server.
+      await persistAbsenceReminderSettings(normalized);
+    } catch {
+      // ignore
+    }
+  }, [persistAbsenceReminderSettings]);
+
   const ensureNotificationPermission = useCallback(async (): Promise<boolean> => {
     if (!Capacitor.isNativePlatform()) return false;
 
@@ -220,9 +285,12 @@ const MemberDashboard: React.FC = () => {
       router.push("/home", "root", "replace");
     }
 
-    // Load streak, absence status, and daily motivation
-    loadDashboardData();
-  }, [router, loadDashboardData]);
+    // Sync reminder settings (same account) then load dashboard.
+    (async () => {
+      await loadAbsenceReminderSettings();
+      await loadDashboardData();
+    })();
+  }, [router, loadAbsenceReminderSettings, loadDashboardData]);
 
   const handleRequestNotificationPermission = async () => {
     await ensureNotificationPermission();
@@ -234,7 +302,12 @@ const MemberDashboard: React.FC = () => {
   const handleToggleReminder = async () => {
     const next = !reminderEnabled;
     setReminderEnabled(next);
-    localStorage.setItem('absenceReminderEnabled', String(next));
+    await persistAbsenceReminderSettings({
+      enabled: next,
+      thresholdDays,
+      reminderHour,
+      reminderMinute,
+    });
 
     if (!Capacitor.isNativePlatform()) return;
 
@@ -244,7 +317,12 @@ const MemberDashboard: React.FC = () => {
   const handleThresholdChange = async (value: number) => {
     const next = Math.max(1, Number(value));
     setThresholdDays(next);
-    localStorage.setItem('absenceReminderThresholdDays', String(next));
+    await persistAbsenceReminderSettings({
+      enabled: reminderEnabled,
+      thresholdDays: next,
+      reminderHour,
+      reminderMinute,
+    });
   };
 
   const handleTimePresetChange = async (preset: string) => {
@@ -256,8 +334,12 @@ const MemberDashboard: React.FC = () => {
     const next = map[preset] ?? { hour: DEFAULT_REMINDER_HOUR, minute: DEFAULT_REMINDER_MINUTE };
     setReminderHour(next.hour);
     setReminderMinute(next.minute);
-    localStorage.setItem('absenceReminderHour', String(next.hour));
-    localStorage.setItem('absenceReminderMinute', String(next.minute));
+    await persistAbsenceReminderSettings({
+      enabled: reminderEnabled,
+      thresholdDays,
+      reminderHour: next.hour,
+      reminderMinute: next.minute,
+    });
   };
 
   useEffect(() => {

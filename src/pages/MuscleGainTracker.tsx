@@ -38,6 +38,9 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import './MuscleGainTracker.css';
+import { API_CONFIG } from '../config/api.config';
+
+const API_URL = API_CONFIG.BASE_URL;
 
 ChartJS.register(
   CategoryScale,
@@ -68,6 +71,21 @@ interface MuscleGainRecord {
   notes: string;
 }
 
+const toNumber = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const getMeasurement = (r: any, key: keyof MuscleGainRecord['measurements']): number => {
+  // Supports both canonical shape: r.measurements.key and legacy/flattened shape: r.key
+  return toNumber(r?.measurements?.[key] ?? r?.[key]);
+};
+
+const getStrength = (r: any, key: keyof MuscleGainRecord['strengthStats']): number => {
+  // Supports both canonical shape: r.strengthStats.key and legacy/flattened shape: r.key
+  return toNumber(r?.strengthStats?.[key] ?? r?.[key]);
+};
+
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -87,11 +105,35 @@ const MuscleGainTracker: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [selectedChart, setSelectedChart] = useState('measurements');
 
-  useEffect(() => {
-    const stored = localStorage.getItem('muscleGainRecords');
-    if (stored) {
-      setRecords(JSON.parse(stored));
+  const loadRecords = async () => {
+    const token = localStorage.getItem('token') || '';
+
+    // If not logged in, fall back to local-only storage.
+    if (!token) {
+      const stored = localStorage.getItem('muscleGainRecords');
+      if (stored) setRecords(JSON.parse(stored));
+      return;
     }
+
+    try {
+      const res = await fetch(`${API_URL}/muscle-gain/records`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || 'Failed to load records');
+      }
+      setRecords(Array.isArray(data.records) ? data.records : []);
+    } catch (err) {
+      // Fallback to local cache so the page still works if offline,
+      // but note: this does NOT sync across devices.
+      const stored = localStorage.getItem('muscleGainRecords');
+      if (stored) setRecords(JSON.parse(stored));
+    }
+  };
+
+  useEffect(() => {
+    loadRecords();
   }, []);
 
   const handleUpdate = () => {
@@ -122,9 +164,43 @@ const MuscleGainTracker: React.FC = () => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    setRecords(updatedRecords);
-    localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
-    clearForm();
+    // Persist to server when logged in; otherwise local-only.
+    const token = localStorage.getItem('token') || '';
+    if (!token) {
+      setRecords(updatedRecords);
+      localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+      clearForm();
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/muscle-gain/records`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(newRecord),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message || 'Failed to save record');
+        }
+
+        const nextRecords = Array.isArray(data.records) ? data.records : updatedRecords;
+        setRecords(nextRecords);
+        // keep a local cache as a fallback for offline mode
+        localStorage.setItem('muscleGainRecords', JSON.stringify(nextRecords));
+        clearForm();
+      } catch (e: any) {
+        // If server save fails, keep local so user doesn't lose the entry.
+        setRecords(updatedRecords);
+        localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+        clearForm();
+        alert(`Saved locally only (server sync failed): ${e?.message || 'unknown error'}`);
+      }
+    })();
   };
 
   const validateInputs = () => {
@@ -161,9 +237,31 @@ const MuscleGainTracker: React.FC = () => {
 
   const handleDeleteAll = () => {
     if (window.confirm('Are you sure you want to delete all records?')) {
-      setRecords([]);
-      localStorage.removeItem('muscleGainRecords');
-      clearForm();
+      const token = localStorage.getItem('token') || '';
+      if (!token) {
+        setRecords([]);
+        localStorage.removeItem('muscleGainRecords');
+        clearForm();
+        return;
+      }
+
+      (async () => {
+        try {
+          const res = await fetch(`${API_URL}/muscle-gain/records`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok || !data?.success) {
+            throw new Error(data?.message || 'Failed to delete records');
+          }
+          setRecords([]);
+          localStorage.removeItem('muscleGainRecords');
+          clearForm();
+        } catch (e: any) {
+          alert(`Failed to delete from server: ${e?.message || 'unknown error'}`);
+        }
+      })();
     }
   };
 
@@ -172,23 +270,37 @@ const MuscleGainTracker: React.FC = () => {
     datasets: [
       {
         label: 'Chest (cm)',
-        data: records.map(r => r.measurements.chest),
+        data: records.map(r => getMeasurement(r, 'chest')),
         borderColor: '#FF6B6B',
         backgroundColor: 'rgba(255, 107, 107, 0.1)',
         tension: 0.4
       },
       {
         label: 'Arms (cm)',
-        data: records.map(r => r.measurements.arms),
+        data: records.map(r => getMeasurement(r, 'arms')),
         borderColor: '#4ECDC4',
         backgroundColor: 'rgba(78, 205, 196, 0.1)',
         tension: 0.4
       },
       {
         label: 'Shoulders (cm)',
-        data: records.map(r => r.measurements.shoulders),
+        data: records.map(r => getMeasurement(r, 'shoulders')),
         borderColor: '#45B7D1',
         backgroundColor: 'rgba(69, 183, 209, 0.1)',
+        tension: 0.4
+      },
+      {
+        label: 'Back (cm)',
+        data: records.map(r => getMeasurement(r, 'back')),
+        borderColor: '#F7B801',
+        backgroundColor: 'rgba(247, 184, 1, 0.1)',
+        tension: 0.4
+      },
+      {
+        label: 'Legs (cm)',
+        data: records.map(r => getMeasurement(r, 'legs')),
+        borderColor: '#9B5DE5',
+        backgroundColor: 'rgba(155, 93, 229, 0.1)',
         tension: 0.4
       }
     ]
@@ -199,17 +311,17 @@ const MuscleGainTracker: React.FC = () => {
     datasets: [
       {
         label: 'Bench Press (kg)',
-        data: records.map(r => r.strengthStats.benchPress),
+        data: records.map(r => getStrength(r, 'benchPress')),
         backgroundColor: '#FF6B6B'
       },
       {
         label: 'Deadlift (kg)',
-        data: records.map(r => r.strengthStats.deadlift),
+        data: records.map(r => getStrength(r, 'deadlift')),
         backgroundColor: '#4ECDC4'
       },
       {
         label: 'Squat (kg)',
-        data: records.map(r => r.strengthStats.squat),
+        data: records.map(r => getStrength(r, 'squat')),
         backgroundColor: '#45B7D1'
       }
     ]
@@ -372,9 +484,9 @@ const MuscleGainTracker: React.FC = () => {
             
             <div className="chart-container">
               {selectedChart === 'measurements' ? (
-                <Line data={measurementsChartData} options={chartOptions as ChartOptions<'line'>} />
+                <Line key="measurements" data={measurementsChartData} options={chartOptions as ChartOptions<'line'>} />
               ) : (
-                <Bar data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
+                <Bar key="strength" data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
               )}
             </div>
           </div>
@@ -389,9 +501,21 @@ const MuscleGainTracker: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Date</th>
-                      <th>Chest</th>
-                      <th>Arms</th>
-                      <th>Bench Press</th>
+                      {selectedChart === 'measurements' ? (
+                        <>
+                          <th>Chest</th>
+                          <th>Arms</th>
+                          <th>Shoulders</th>
+                          <th>Back</th>
+                          <th>Legs</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Bench</th>
+                          <th>Deadlift</th>
+                          <th>Squat</th>
+                        </>
+                      )}
                       <th>Protein</th>
                     </tr>
                   </thead>
@@ -399,10 +523,22 @@ const MuscleGainTracker: React.FC = () => {
                     {records.map((record, index) => (
                       <tr key={index}>
                         <td>{record.date}</td>
-                        <td>{record.measurements.chest} cm</td>
-                        <td>{record.measurements.arms} cm</td>
-                        <td>{record.strengthStats.benchPress} kg</td>
-                        <td>{record.proteinIntake} g</td>
+                        {selectedChart === 'measurements' ? (
+                          <>
+                            <td>{getMeasurement(record, 'chest')} cm</td>
+                            <td>{getMeasurement(record, 'arms')} cm</td>
+                            <td>{getMeasurement(record, 'shoulders')} cm</td>
+                            <td>{getMeasurement(record, 'back')} cm</td>
+                            <td>{getMeasurement(record, 'legs')} cm</td>
+                          </>
+                        ) : (
+                          <>
+                            <td>{getStrength(record, 'benchPress')} kg</td>
+                            <td>{getStrength(record, 'deadlift')} kg</td>
+                            <td>{getStrength(record, 'squat')} kg</td>
+                          </>
+                        )}
+                        <td>{toNumber((record as any)?.proteinIntake)} g</td>
                       </tr>
                     ))}
                   </tbody>
@@ -421,21 +557,48 @@ const MuscleGainTracker: React.FC = () => {
                           <div style={{ fontWeight: 700, marginBottom: 10 }}>{record.date}</div>
                           <IonGrid style={{ padding: 0 }}>
                             <IonRow>
-                              <IonCol size="6">
-                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>Chest</div>
-                                <div style={{ fontWeight: 700 }}>{record.measurements.chest} cm</div>
-                              </IonCol>
-                              <IonCol size="6">
-                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>Arms</div>
-                                <div style={{ fontWeight: 700 }}>{record.measurements.arms} cm</div>
-                              </IonCol>
-                              <IonCol size="6">
-                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>Bench</div>
-                                <div style={{ fontWeight: 700 }}>{record.strengthStats.benchPress} kg</div>
-                              </IonCol>
+                              {selectedChart === 'measurements' ? (
+                                <>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Chest</div>
+                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'chest')} cm</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Arms</div>
+                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'arms')} cm</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Shoulders</div>
+                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'shoulders')} cm</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Back</div>
+                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'back')} cm</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Legs</div>
+                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'legs')} cm</div>
+                                  </IonCol>
+                                </>
+                              ) : (
+                                <>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Bench</div>
+                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'benchPress')} kg</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Deadlift</div>
+                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'deadlift')} kg</div>
+                                  </IonCol>
+                                  <IonCol size="6">
+                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Squat</div>
+                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'squat')} kg</div>
+                                  </IonCol>
+                                </>
+                              )}
                               <IonCol size="6">
                                 <div style={{ color: '#b0b0b0', fontSize: 12 }}>Protein</div>
-                                <div style={{ fontWeight: 700 }}>{record.proteinIntake} g</div>
+                                <div style={{ fontWeight: 700 }}>{toNumber((record as any)?.proteinIntake)} g</div>
                               </IonCol>
                             </IonRow>
                           </IonGrid>
