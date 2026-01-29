@@ -1,13 +1,28 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+function parseBool(value, fallback) {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+const dbHost = process.env.DB_HOST || 'localhost';
+const isLocalHost = dbHost === 'localhost' || dbHost === '127.0.0.1';
+const shouldUseSSL = parseBool(process.env.DB_SSL, !isLocalHost);
+const defaultRejectUnauthorized = dbHost.includes('render.com') ? false : true;
+const sslRejectUnauthorized = parseBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, defaultRejectUnauthorized);
+const sslConfig = shouldUseSSL ? { rejectUnauthorized: sslRejectUnauthorized } : false;
+
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
+  host: dbHost,
   port: parseInt(process.env.DB_PORT || '5432'),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'activecore',
-  ssl: process.env.DB_HOST?.includes('render.com') ? { rejectUnauthorized: false } : false,
+  ssl: sslConfig,
 });
 
 async function addMissingColumns() {

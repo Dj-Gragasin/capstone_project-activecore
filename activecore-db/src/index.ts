@@ -876,7 +876,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: 'connected',
-      port: process.env.DB_PORT || '3308'
+      port: process.env.DB_PORT || '5432'
     });
   } catch (error) {
     res.status(503).json({

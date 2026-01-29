@@ -3,22 +3,75 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const parseBool = (value: string | undefined, fallback: boolean): boolean => {
+  if (value === undefined) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
+const connectionString = process.env.DATABASE_URL?.trim();
+
+type EffectiveDbInfo = {
+  host: string;
+  port: string;
+  database: string;
+  user: string;
+};
+
+const deriveEffectiveDbInfo = (): EffectiveDbInfo => {
+  if (connectionString) {
+    try {
+      const url = new URL(connectionString);
+      return {
+        host: url.hostname || 'localhost',
+        port: url.port || '5432',
+        database: (url.pathname || '').replace(/^\//, '') || 'activecore',
+        user: decodeURIComponent(url.username || '') || 'postgres',
+      };
+    } catch {
+      // Fall back to DB_* if DATABASE_URL is malformed
+    }
+  }
+
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || '5432',
+    database: process.env.DB_NAME || 'activecore',
+    user: process.env.DB_USER || 'postgres',
+  };
+};
+
+const effectiveDb = deriveEffectiveDbInfo();
+const isLocalHost = effectiveDb.host === 'localhost' || effectiveDb.host === '127.0.0.1';
+const shouldUseSSL = parseBool(process.env.DB_SSL, !isLocalHost);
+// Keep old behavior for Render unless overridden.
+const defaultRejectUnauthorized = effectiveDb.host.includes('render.com') ? false : true;
+const sslRejectUnauthorized = parseBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, defaultRejectUnauthorized);
+const sslConfig = shouldUseSSL ? { rejectUnauthorized: sslRejectUnauthorized } : false;
+
 console.log('🔍 Database Configuration:');
-console.log('   Host:', process.env.DB_HOST || 'localhost');
-console.log('   Port:', process.env.DB_PORT || '5432');
-console.log('   User:', process.env.DB_USER || 'postgres');
-console.log('   Database:', process.env.DB_NAME || 'activecore');
+console.log('   Host:', effectiveDb.host);
+console.log('   Port:', effectiveDb.port);
+console.log('   User:', effectiveDb.user);
+console.log('   Database:', effectiveDb.database);
+console.log('   Using DATABASE_URL:', connectionString ? 'yes' : 'no');
 
 const pgPool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'activecore',
+  ...(connectionString
+    ? { connectionString }
+    : {
+        host: effectiveDb.host,
+        port: parseInt(effectiveDb.port || '5432'),
+        user: effectiveDb.user,
+        password: process.env.DB_PASSWORD || '',
+        database: effectiveDb.database,
+      }),
   max: 10,
   idleTimeoutMillis: 60000,
   connectionTimeoutMillis: 10000, // Increased from 2000ms to 10000ms for remote databases
-  ssl: process.env.DB_HOST?.includes('render.com') ? { rejectUnauthorized: false } : false,
+  ssl: sslConfig,
 });
 
 // MySQL-compatible result interface
@@ -73,10 +126,10 @@ export const pool = new MySQLCompatiblePool(pgPool);
 export async function initializeDatabase() {
   try {
     console.log('\n🔌 Connecting to database...');
-    console.log('   Host:', process.env.DB_HOST || 'localhost');
-    console.log('   Port:', process.env.DB_PORT || '5432');
-    console.log('   User:', process.env.DB_USER || 'postgres');
-    console.log('   Database:', process.env.DB_NAME || 'activecore');
+    console.log('   Host:', effectiveDb.host);
+    console.log('   Port:', effectiveDb.port);
+    console.log('   User:', effectiveDb.user);
+    console.log('   Database:', effectiveDb.database);
     
     // Test connection by running a simple query with timeout
     const timeoutPromise = new Promise((_, reject) =>
@@ -88,8 +141,8 @@ export async function initializeDatabase() {
     await Promise.race([queryPromise, timeoutPromise]);
     
     console.log('✅ Database connected successfully!');
-    console.log('🗄️  Database:', process.env.DB_NAME || 'activecore');
-    console.log('📊 Host:', process.env.DB_HOST || 'localhost');
+    console.log('🗄️  Database:', effectiveDb.database);
+    console.log('📊 Host:', effectiveDb.host);
     console.log('');
     return true;
   } catch (error: any) {
@@ -100,10 +153,10 @@ export async function initializeDatabase() {
     console.error('Code:', error.code);
     console.error('');
     console.error('Attempted connection:');
-    console.error('  Host:', process.env.DB_HOST || 'localhost');
-    console.error('  Port:', process.env.DB_PORT || '5432');
-    console.error('  User:', process.env.DB_USER || 'postgres');
-    console.error('  Database:', process.env.DB_NAME || 'activecore');
+    console.error('  Host:', effectiveDb.host);
+    console.error('  Port:', effectiveDb.port);
+    console.error('  User:', effectiveDb.user);
+    console.error('  Database:', effectiveDb.database);
     console.error('');
     console.error('📝 Troubleshooting steps:');
     console.error('1. Verify .env file exists in activecore-db/ folder');
