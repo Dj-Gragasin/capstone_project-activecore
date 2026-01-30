@@ -1,5 +1,6 @@
 import { Pool, QueryResult, PoolClient } from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -47,9 +48,32 @@ const effectiveDb = deriveEffectiveDbInfo();
 const isLocalHost = effectiveDb.host === 'localhost' || effectiveDb.host === '127.0.0.1';
 const shouldUseSSL = parseBool(process.env.DB_SSL, !isLocalHost);
 // Keep old behavior for Render unless overridden.
-const defaultRejectUnauthorized = effectiveDb.host.includes('render.com') ? false : true;
+// Supabase pooled endpoints can present chains that fail strict verification in some runtimes.
+// Allow overriding via DB_SSL_REJECT_UNAUTHORIZED.
+const hostLower = effectiveDb.host.toLowerCase();
+const defaultRejectUnauthorized =
+  hostLower.includes('render.com') || hostLower.includes('supabase.com') || hostLower.includes('supabase.co')
+    ? false
+    : true;
 const sslRejectUnauthorized = parseBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, defaultRejectUnauthorized);
-const sslConfig = shouldUseSSL ? { rejectUnauthorized: sslRejectUnauthorized } : false;
+
+const sslCaInline = process.env.DB_SSL_CA?.trim();
+const sslCaFilePath = process.env.DB_SSL_CA_FILE?.trim();
+let sslCa: string | undefined;
+
+if (sslCaInline) {
+  // Allow newline-escaped PEM values in env vars.
+  sslCa = sslCaInline.includes('\\n') ? sslCaInline.replace(/\\n/g, '\n') : sslCaInline;
+} else if (sslCaFilePath) {
+  try {
+    sslCa = fs.readFileSync(sslCaFilePath, 'utf8');
+  } catch (error) {
+    console.warn('⚠️  Could not read DB_SSL_CA_FILE:', sslCaFilePath);
+  }
+}
+
+// If a CA is provided, default to strict verification for best security.
+const sslConfig = shouldUseSSL ? { rejectUnauthorized: sslCa ? true : sslRejectUnauthorized, ...(sslCa ? { ca: sslCa } : {}) } : false;
 
 console.log('🔍 Database Configuration:');
 console.log('   Host:', effectiveDb.host);
@@ -164,7 +188,8 @@ export async function initializeDatabase() {
     console.error('3. Confirm DB_PASSWORD is set and correct');
     console.error('4. Verify database "activecore" exists on the server');
     console.error('5. Check if PostgreSQL is running and accessible');
-    console.error('6. Ensure your IP is whitelisted (if applicable)');
+    console.error('6. If you see SELF_SIGNED_CERT_IN_CHAIN, set DB_SSL_REJECT_UNAUTHORIZED=false');
+    console.error('7. Ensure your IP is whitelisted (if applicable)');
     console.error('========================================\n');
     return false;
   }
