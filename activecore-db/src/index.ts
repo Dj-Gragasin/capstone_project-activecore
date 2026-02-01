@@ -1073,14 +1073,27 @@ app.get('/api/health', async (req: Request, res: Response) => {
 app.get('/api/system/status', async (req: Request, res: Response) => {
   try {
     let dbOk = false;
+    let dbDishesCount: number | null = null;
     try {
       await pool.query('SELECT 1');
       dbOk = true;
+
+      // Best-effort: confirm meal DB content exists (avoid failing status endpoint if table missing).
+      try {
+        const [rows] = await pool.query<any>('SELECT COUNT(*)::int AS count FROM filipino_dishes');
+        if (Array.isArray(rows) && rows.length > 0 && typeof rows[0]?.count !== 'undefined') {
+          dbDishesCount = Number(rows[0].count);
+        }
+      } catch {
+        dbDishesCount = null;
+      }
     } catch (e) {
       dbOk = false;
+      dbDishesCount = null;
     }
 
-    const openaiOk = !!process.env.OPENAI_API_KEY && typeof process.env.OPENAI_API_KEY === 'string' && process.env.OPENAI_API_KEY.trim().length > 0;
+    const openaiConfigured = !!process.env.OPENAI_API_KEY && typeof process.env.OPENAI_API_KEY === 'string' && process.env.OPENAI_API_KEY.trim().length > 0;
+    const openaiReady = openaiConfigured && !!openaiAvailable;
 
     let paypalOk = false;
     try {
@@ -1106,7 +1119,13 @@ app.get('/api/system/status', async (req: Request, res: Response) => {
     return res.json({
       ok: true,
       dbConnected: dbOk,
-      openai: openaiOk,
+      dbDishesCount,
+      openai: {
+        configured: openaiConfigured,
+        available: !!openaiAvailable,
+        ready: openaiReady,
+        model: OPENAI_MODEL,
+      },
       paypal: paypalOk,
       timestamp: new Date().toISOString()
     });
