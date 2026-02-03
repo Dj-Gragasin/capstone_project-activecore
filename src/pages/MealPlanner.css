@@ -117,6 +117,13 @@
   gap: 0.5rem;
 }
 
+/* Keep target labels on one line (mobile + desktop) */
+.targets-section ion-item.item-label-stacked ion-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Daily Targets (inputs) - make Ionic grid behave nicely on small phones */
 .targets-grid {
   --ion-grid-padding: 0;
@@ -131,17 +138,37 @@
   padding: 6px;
 }
 
+/* Targets inputs: make numbers easier to read in 2x2 layout */
+.targets-section ion-input.custom-input {
+  --padding-start: 0.75rem;
+  --padding-end: 0.75rem;
+}
+
+.targets-section ion-input.custom-input::part(native) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 420px) {
-  /* On very small screens, stack targets vertically (1 per row) */
+  /* Keep a clean 2x2 layout on typical phones */
   .targets-grid {
     --ion-grid-column-padding: 6px;
   }
 
   .targets-grid ion-col {
-    flex: 0 0 100%;
-    max-width: 100%;
-    width: 100%;
-    padding: 6px 0;
+    padding: 4px;
+  }
+
+  .targets-section ion-item.custom-item {
+    --padding-start: 0.75rem;
+    --padding-end: 0.75rem;
+    --inner-padding-end: 0.75rem;
+  }
+
+  .targets-section ion-input.custom-input {
+    --padding-start: 0.6rem;
+    --padding-end: 0.6rem;
+    font-size: 1.05rem;
   }
 
   .targets-section h3 {
@@ -159,7 +186,20 @@
   }
 
   .targets-section ion-label {
-    font-size: 0.95rem;
+    font-size: 0.84rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 320px) {
+  /* Ultra-small screens: fall back to 1 per row to avoid cramped inputs */
+  .targets-grid ion-col {
+    flex: 0 0 100%;
+    max-width: 100%;
+    width: 100%;
+    padding: 6px 0;
   }
 }
 

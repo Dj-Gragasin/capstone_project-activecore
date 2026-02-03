@@ -1165,7 +1165,7 @@ const MealPlanner: React.FC = () => {
                   
                   <IonGrid className="targets-grid">
                     <IonRow>
-                      <IonCol size="12" sizeSm="6">
+                      <IonCol size="6" sizeSm="6">
                         <div className="target-input-group">
                           <IonItem className="custom-item">
                             <IonLabel position="stacked">🔥 Calories</IonLabel>
@@ -1178,7 +1178,7 @@ const MealPlanner: React.FC = () => {
                           </IonItem>
                         </div>
                       </IonCol>
-                      <IonCol size="12" sizeSm="6">
+                      <IonCol size="6" sizeSm="6">
                         <div className="target-input-group">
                           <IonItem className="custom-item">
                             <IonLabel position="stacked">💪 Protein (g)</IonLabel>
@@ -1193,7 +1193,7 @@ const MealPlanner: React.FC = () => {
                       </IonCol>
                     </IonRow>
                     <IonRow>
-                      <IonCol size="12" sizeSm="6">
+                      <IonCol size="6" sizeSm="6">
                         <div className="target-input-group">
                           <IonItem className="custom-item">
                             <IonLabel position="stacked">🍚 Carbs (g)</IonLabel>
@@ -1206,7 +1206,7 @@ const MealPlanner: React.FC = () => {
                           </IonItem>
                         </div>
                       </IonCol>
-                      <IonCol size="12" sizeSm="6">
+                      <IonCol size="6" sizeSm="6">
                         <div className="target-input-group">
                           <IonItem className="custom-item">
                             <IonLabel position="stacked">🥑 Fats (g)</IonLabel>
