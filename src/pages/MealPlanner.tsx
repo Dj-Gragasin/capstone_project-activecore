@@ -318,7 +318,7 @@ const MealPlanner: React.FC = () => {
 
   async function checkBackendStatus(token?: string) {
     try {
-      const resp = await fetch(`${process.env.REACT_APP_API_URL || API_URL}/system/status`, {
+      const resp = await fetch(`${API_URL}/system/status`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) {
@@ -371,7 +371,7 @@ const MealPlanner: React.FC = () => {
         },
       };
 
-      const resp = await fetch(`${process.env.REACT_APP_API_URL || API_URL}/meal-planner/generate`, {
+      const resp = await fetch(`${API_URL}/meal-planner/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -874,7 +874,7 @@ const MealPlanner: React.FC = () => {
     try {
       const token = localStorage.getItem("token") || "";
 
-      // API endpoint (use your API_URL constant that points to http://localhost:3002/api)
+      // API endpoint (configured via API_CONFIG.BASE_URL)
       const endpoint = `${API_URL}/meal-planner/regenerate`;
 
       // Current meal to exclude (avoid returning same meal)

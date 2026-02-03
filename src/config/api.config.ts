@@ -10,19 +10,16 @@ export const API_CONFIG = {
     const fromEnv = (process.env.REACT_APP_API_URL || '').trim();
     if (fromEnv) return fromEnv.replace(/\/$/, '');
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const nodeEnv = process.env.NODE_ENV;
 
-    // In production, silently defaulting to localhost breaks real devices (Android/iOS) because
-    // "localhost" refers to the PHONE itself. Try to infer a same-origin API, otherwise warn.
-    if (isProd && typeof window !== 'undefined' && window.location?.origin) {
-      // If you host the API behind the same domain (reverse proxy), this will work.
-      // Otherwise you MUST set REACT_APP_API_URL at build time.
-      // Example: https://api.example.com/api
+    // In production (and generally any non-dev environment), never fall back to localhost.
+    // Use same-origin /api so Vercel (or any reverse proxy) can forward requests.
+    if (nodeEnv !== 'development') {
       console.warn(
-        '[API_CONFIG] REACT_APP_API_URL is not set for a production build. Falling back to same-origin /api. '
-        + 'If your backend is on a different domain, set REACT_APP_API_URL and rebuild/redeploy.'
+        '[API_CONFIG] REACT_APP_API_URL is not set. Falling back to same-origin /api. '
+          + 'If your backend is on a different domain, set REACT_APP_API_URL and rebuild/redeploy.'
       );
-      return `${window.location.origin.replace(/\/$/, '')}/api`;
+      return '/api';
     }
 
     // Development fallback only.
