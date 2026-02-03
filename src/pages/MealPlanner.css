@@ -147,6 +147,20 @@
   .targets-section h3 {
     font-size: 1.05rem;
   }
+
+  /* Reduce vertical height of stacked-label ion-items within the targets section */
+  .targets-section ion-item.item-label-stacked,
+  .targets-section ion-item.item-label-floating {
+    --padding-top: 10px;
+    --padding-bottom: 10px;
+    --inner-padding-top: 10px;
+    --inner-padding-bottom: 10px;
+    --min-height: 62px;
+  }
+
+  .targets-section ion-label {
+    font-size: 0.95rem;
+  }
 }
 
 /* Ion Items - Dark Theme Override */
