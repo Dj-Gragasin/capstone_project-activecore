@@ -55,13 +55,6 @@ ChartJS.register(
 
 interface MuscleGainRecord {
   date: string;
-  measurements: {
-    chest: number;
-    arms: number;
-    shoulders: number;
-    back: number;
-    legs: number;
-  };
   strengthStats: {
     benchPress: number;
     deadlift: number;
@@ -76,11 +69,6 @@ const toNumber = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const getMeasurement = (r: any, key: keyof MuscleGainRecord['measurements']): number => {
-  // Supports both canonical shape: r.measurements.key and legacy/flattened shape: r.key
-  return toNumber(r?.measurements?.[key] ?? r?.[key]);
-};
-
 const getStrength = (r: any, key: keyof MuscleGainRecord['strengthStats']): number => {
   // Supports both canonical shape: r.strengthStats.key and legacy/flattened shape: r.key
   return toNumber(r?.strengthStats?.[key] ?? r?.[key]);
@@ -89,13 +77,6 @@ const getStrength = (r: any, key: keyof MuscleGainRecord['strengthStats']): numb
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [measurements, setMeasurements] = useState({
-    chest: '',
-    arms: '',
-    shoulders: '',
-    back: '',
-    legs: ''
-  });
   const [strengthStats, setStrengthStats] = useState({
     benchPress: '',
     deadlift: '',
@@ -103,7 +84,7 @@ const MuscleGainTracker: React.FC = () => {
   });
   const [proteinIntake, setProteinIntake] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedChart, setSelectedChart] = useState('measurements');
+  const [selectedChart, setSelectedChart] = useState('strength');
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
@@ -144,13 +125,6 @@ const MuscleGainTracker: React.FC = () => {
 
     const newRecord: MuscleGainRecord = {
       date,
-      measurements: {
-        chest: parseFloat(measurements.chest),
-        arms: parseFloat(measurements.arms),
-        shoulders: parseFloat(measurements.shoulders),
-        back: parseFloat(measurements.back),
-        legs: parseFloat(measurements.legs)
-      },
       strengthStats: {
         benchPress: parseFloat(strengthStats.benchPress),
         deadlift: parseFloat(strengthStats.deadlift),
@@ -205,11 +179,6 @@ const MuscleGainTracker: React.FC = () => {
 
   const validateInputs = () => {
     return (
-      measurements.chest &&
-      measurements.arms &&
-      measurements.shoulders &&
-      measurements.back &&
-      measurements.legs &&
       strengthStats.benchPress &&
       strengthStats.deadlift &&
       strengthStats.squat &&
@@ -219,13 +188,6 @@ const MuscleGainTracker: React.FC = () => {
 
   const clearForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
-    setMeasurements({
-      chest: '',
-      arms: '',
-      shoulders: '',
-      back: '',
-      legs: ''
-    });
     setStrengthStats({
       benchPress: '',
       deadlift: '',
@@ -263,47 +225,6 @@ const MuscleGainTracker: React.FC = () => {
         }
       })();
     }
-  };
-
-  const measurementsChartData = {
-    labels: records.map(r => r.date),
-    datasets: [
-      {
-        label: 'Chest (cm)',
-        data: records.map(r => getMeasurement(r, 'chest')),
-        borderColor: '#FF6B6B',
-        backgroundColor: 'rgba(255, 107, 107, 0.1)',
-        tension: 0.4
-      },
-      {
-        label: 'Arms (cm)',
-        data: records.map(r => getMeasurement(r, 'arms')),
-        borderColor: '#4ECDC4',
-        backgroundColor: 'rgba(78, 205, 196, 0.1)',
-        tension: 0.4
-      },
-      {
-        label: 'Shoulders (cm)',
-        data: records.map(r => getMeasurement(r, 'shoulders')),
-        borderColor: '#45B7D1',
-        backgroundColor: 'rgba(69, 183, 209, 0.1)',
-        tension: 0.4
-      },
-      {
-        label: 'Back (cm)',
-        data: records.map(r => getMeasurement(r, 'back')),
-        borderColor: '#F7B801',
-        backgroundColor: 'rgba(247, 184, 1, 0.1)',
-        tension: 0.4
-      },
-      {
-        label: 'Legs (cm)',
-        data: records.map(r => getMeasurement(r, 'legs')),
-        borderColor: '#9B5DE5',
-        backgroundColor: 'rgba(155, 93, 229, 0.1)',
-        tension: 0.4
-      }
-    ]
   };
 
   const strengthChartData = {
@@ -358,7 +279,7 @@ const MuscleGainTracker: React.FC = () => {
       },
       title: {
         display: true,
-        text: selectedChart === 'measurements' ? 'Body Measurements Progress' : 'Strength Progress',
+        text: 'Strength Progress',
         color: '#ffffff',
         font: {
           size: 16
@@ -385,39 +306,13 @@ const MuscleGainTracker: React.FC = () => {
               <div className="form-section">
                 <div className="form-section-title">
                   <IonIcon icon={barbell} />
-                  <span>Body Measurements</span>
+                  <span>Strength Stats</span>
                 </div>
-                <div className="form-section-description">Track your body measurements in centimeters</div>
+                <div className="form-section-description">Record your lifting achievements in kilograms</div>
                 <IonItem>
                   <IonLabel position="stacked">Date</IonLabel>
                   <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value!)} />
                 </IonItem>
-                {Object.entries(measurements).map(([key, value]) => (
-                  <IonItem key={key}>
-                    <IonLabel position="stacked">{key.charAt(0).toUpperCase() + key.slice(1)} (cm)</IonLabel>
-                    <IonInput
-                      type="number"
-                      value={value}
-                      onIonChange={e =>
-                        setMeasurements(prev => ({
-                          ...prev,
-                          [key]: e.detail.value!,
-                        }))
-                      }
-                      placeholder={`Enter ${key} measurement`}
-                    />
-                  </IonItem>
-                ))}
-              </div>
-            </IonCol>
-
-            <IonCol size="12" sizeMd="6">
-              <div className="form-section">
-                <div className="form-section-title">
-                  <IonIcon icon={analytics} />
-                  <span>Strength Stats</span>
-                </div>
-                <div className="form-section-description">Record your lifting achievements in kilograms</div>
                 {Object.entries(strengthStats).map(([key, value]) => (
                   <IonItem key={key}>
                     <IonLabel position="stacked">{key.replace(/([A-Z])/g, ' $1').trim()} (kg)</IonLabel>
@@ -449,6 +344,16 @@ const MuscleGainTracker: React.FC = () => {
                 </IonItem>
               </div>
             </IonCol>
+
+            <IonCol size="12" sizeMd="6">
+              <div className="form-section">
+                <div className="form-section-title">
+                  <IonIcon icon={analytics} />
+                  <span>Progress Overview</span>
+                </div>
+                <div className="form-section-description">View your strength progression over time</div>
+              </div>
+            </IonCol>
           </IonRow>
 
           <IonRow className="button-container">
@@ -476,18 +381,13 @@ const MuscleGainTracker: React.FC = () => {
               <IonItem>
                 <IonLabel>Chart</IonLabel>
                 <IonSelect value={selectedChart} onIonChange={(e) => setSelectedChart(e.detail.value)} interface="popover">
-                  <IonSelectOption value="measurements">Measurements</IonSelectOption>
                   <IonSelectOption value="strength">Strength</IonSelectOption>
                 </IonSelect>
               </IonItem>
             </div>
             
             <div className="chart-container">
-              {selectedChart === 'measurements' ? (
-                <Line key="measurements" data={measurementsChartData} options={chartOptions as ChartOptions<'line'>} />
-              ) : (
-                <Bar key="strength" data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
-              )}
+              <Bar key="strength" data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
             </div>
           </div>
         )}
@@ -501,21 +401,11 @@ const MuscleGainTracker: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Date</th>
-                      {selectedChart === 'measurements' ? (
-                        <>
-                          <th>Chest</th>
-                          <th>Arms</th>
-                          <th>Shoulders</th>
-                          <th>Back</th>
-                          <th>Legs</th>
-                        </>
-                      ) : (
-                        <>
-                          <th>Bench</th>
-                          <th>Deadlift</th>
-                          <th>Squat</th>
-                        </>
-                      )}
+                      <>
+                        <th>Bench</th>
+                        <th>Deadlift</th>
+                        <th>Squat</th>
+                      </>
                       <th>Protein</th>
                     </tr>
                   </thead>
@@ -523,21 +413,11 @@ const MuscleGainTracker: React.FC = () => {
                     {records.map((record, index) => (
                       <tr key={index}>
                         <td>{record.date}</td>
-                        {selectedChart === 'measurements' ? (
-                          <>
-                            <td>{getMeasurement(record, 'chest')} cm</td>
-                            <td>{getMeasurement(record, 'arms')} cm</td>
-                            <td>{getMeasurement(record, 'shoulders')} cm</td>
-                            <td>{getMeasurement(record, 'back')} cm</td>
-                            <td>{getMeasurement(record, 'legs')} cm</td>
-                          </>
-                        ) : (
-                          <>
-                            <td>{getStrength(record, 'benchPress')} kg</td>
-                            <td>{getStrength(record, 'deadlift')} kg</td>
-                            <td>{getStrength(record, 'squat')} kg</td>
-                          </>
-                        )}
+                        <>
+                          <td>{getStrength(record, 'benchPress')} kg</td>
+                          <td>{getStrength(record, 'deadlift')} kg</td>
+                          <td>{getStrength(record, 'squat')} kg</td>
+                        </>
                         <td>{toNumber((record as any)?.proteinIntake)} g</td>
                       </tr>
                     ))}
@@ -557,45 +437,20 @@ const MuscleGainTracker: React.FC = () => {
                           <div style={{ fontWeight: 700, marginBottom: 10 }}>{record.date}</div>
                           <IonGrid style={{ padding: 0 }}>
                             <IonRow>
-                              {selectedChart === 'measurements' ? (
-                                <>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Chest</div>
-                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'chest')} cm</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Arms</div>
-                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'arms')} cm</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Shoulders</div>
-                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'shoulders')} cm</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Back</div>
-                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'back')} cm</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Legs</div>
-                                    <div style={{ fontWeight: 700 }}>{getMeasurement(record, 'legs')} cm</div>
-                                  </IonCol>
-                                </>
-                              ) : (
-                                <>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Bench</div>
-                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'benchPress')} kg</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Deadlift</div>
-                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'deadlift')} kg</div>
-                                  </IonCol>
-                                  <IonCol size="6">
-                                    <div style={{ color: '#b0b0b0', fontSize: 12 }}>Squat</div>
-                                    <div style={{ fontWeight: 700 }}>{getStrength(record, 'squat')} kg</div>
-                                  </IonCol>
-                                </>
-                              )}
+                              <>
+                                <IonCol size="6">
+                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Bench</div>
+                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'benchPress')} kg</div>
+                                </IonCol>
+                                <IonCol size="6">
+                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Deadlift</div>
+                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'deadlift')} kg</div>
+                                </IonCol>
+                                <IonCol size="6">
+                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Squat</div>
+                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'squat')} kg</div>
+                                </IonCol>
+                              </>
                               <IonCol size="6">
                                 <div style={{ color: '#b0b0b0', fontSize: 12 }}>Protein</div>
                                 <div style={{ fontWeight: 700 }}>{toNumber((record as any)?.proteinIntake)} g</div>
