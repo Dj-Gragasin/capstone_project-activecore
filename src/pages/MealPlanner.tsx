@@ -47,6 +47,7 @@ import {
   checkmarkCircle,
   listCircle,
   time,
+  sparkles,
 } from "ionicons/icons";
 import "./MealPlanner.css";
 
@@ -108,18 +109,11 @@ const HEALTH_CONDITIONS: Array<{ value: string; label: string }> = [
   { value: "chronic_kidney_disease", label: "Chronic Kidney Disease" },
 ];
 
-const CULTURAL_CONTEXTS: Array<{ value: string; label: string }> = [
-  { value: "filipino", label: "Filipino" },
-  { value: "filipino_budget", label: "Filipino budget/local foods" },
-  { value: "mixed_asian", label: "Mixed Asian" },
-  { value: "western", label: "Western-influenced" },
-];
-
 const RELIGIOUS_RESTRICTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "None" },
-  { value: "halal", label: "Halal / no pork" },
-  { value: "no_pork", label: "No pork" },
-  { value: "no_beef", label: "No beef" },
+  { value: "halal", label: "Halal / No Pork" },
+  { value: "no_pork", label: "No Pork" },
+  { value: "no_beef", label: "No Beef" },
   { value: "vegetarian", label: "Vegetarian" },
 ];
 
@@ -150,16 +144,58 @@ const ALCOHOL_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "frequent", label: "Frequent" },
 ];
 
-const normalizeDietValue = (raw: any): string => {
-  const value = String(raw || "")
+const normalizeDietValue = (raw: unknown): string => {
+  const value = String(raw ?? "")
     .trim()
     .toLowerCase();
-  if (!value || value === "none" || value === "no_specific_diet") return "";
 
-  const canonical = value.replace(/[\s-]+/g, "_");
-  const allowed = new Set(PH_COMMON_DIETS.map((d) => d.value));
+  if (!value || value === "none" || value === "no_specific_diet") {
+    return "";
+  }
+
+  const canonical = value
+    .replace(/[\s/-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  const allowed = new Set(PH_COMMON_DIETS.map((option) => option.value));
   return allowed.has(canonical) ? canonical : "";
 };
+
+const normalizeReligiousRestrictionValue = (raw: unknown): string => {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!value || value === "none" || value === "no_restriction") {
+    return "";
+  }
+
+  const canonical = value
+    .replace(/[\s/()-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  const aliases: Record<string, string> = {
+    halal: "halal",
+    halal_no_pork: "halal",
+    halal_and_no_pork: "halal",
+    muslim: "halal",
+    no_pork: "no_pork",
+    pork_free: "no_pork",
+    no_beef: "no_beef",
+    beef_free: "no_beef",
+    vegetarian: "vegetarian",
+  };
+
+  const normalized = aliases[value] || aliases[canonical] || canonical;
+  const allowed = new Set(
+    RELIGIOUS_RESTRICTIONS.map((option) => option.value),
+  );
+
+  return allowed.has(normalized) ? normalized : "";
+};
+
 
 const getMealTypeFromDiet = (dietValue: string): string => {
   const normalized = normalizeDietValue(dietValue);
@@ -581,7 +617,7 @@ const HEALTH_TIP_FALLBACKS: Record<string, HealthConditionTip> = {
     condition: "chronic_kidney_disease",
     label: "Chronic Kidney Disease",
     summary:
-      "CKD nutrition varies by stage, dialysis status, laboratory results, nutritional status, and prescribed treatment.",
+      "CKD nutrition varies by treatment status, laboratory results, nutritional status, and clinician-prescribed targets.",
     whyMealPlanChanged: [
       "The plan avoids automatically using a high-protein pattern and applies the renal targets supplied to the backend.",
     ],
@@ -596,7 +632,7 @@ const HEALTH_TIP_FALLBACKS: Record<string, HealthConditionTip> = {
       "potassium, phosphorus, or fluid excess only when restricted by the care team",
     ],
     practicalTips: [
-      "Ask for your CKD stage and whether you are on dialysis.",
+      "Ask whether dialysis or another kidney treatment is being used when that information is available.",
       "Review potassium, phosphorus, sodium, protein, and fluid targets with a renal dietitian.",
     ],
     medicalNote:
@@ -604,6 +640,20 @@ const HEALTH_TIP_FALLBACKS: Record<string, HealthConditionTip> = {
     citationIds: ["niddk_ckd"],
   },
 };
+
+interface RecommendedNutritionTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  sodiumMg: number;
+  saturatedFatMaxG?: number;
+  diet: string;
+  foodPreferences: string[];
+  notes: string[];
+  appliedConditions: string[];
+  removedOptionalRestrictions: string[];
+}
 
 interface SavedMealPlan {
   id: number;
@@ -635,6 +685,10 @@ const MealPlanner: React.FC = () => {
   const [dailyBudgetPhp, setDailyBudgetPhp] = useState<number>(250);
   const [smokingStatus, setSmokingStatus] = useState<string>("none");
   const [alcoholIntake, setAlcoholIntake] = useState<string>("none");
+  const [recommendedTargets, setRecommendedTargets] =
+    useState<RecommendedNutritionTargets | null>(null);
+  const [recommendedSetupApplied, setRecommendedSetupApplied] =
+    useState<boolean>(false);
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -738,7 +792,9 @@ const MealPlanner: React.FC = () => {
           ),
         );
         setCulturalContext(String("filipino"));
-        setReligiousRestriction(String(dietaryPrefs.religious || ""));
+        setReligiousRestriction(
+          normalizeReligiousRestrictionValue(dietaryPrefs.religious),
+        );
         setFoodPreferences(
           normalizeToKnownValues(
             parseDelimitedSelection(dietaryPrefs.foodPreferences || []),
@@ -795,6 +851,260 @@ const MealPlanner: React.FC = () => {
     return Math.min(max, Math.max(min, parsed));
   };
 
+  const calculateRecommendedNutritionTargets =
+    (): RecommendedNutritionTargets => {
+      const safeAge = boundedNumber(age, 30, 10, 100);
+      const safeHeightCm = boundedNumber(heightCm, 165, 100, 240);
+      const safeWeightKg = boundedNumber(weightKg, 65, 25, 250);
+      const normalizedSex = String(sex || "")
+        .trim()
+        .toLowerCase();
+
+      // Mifflin-St Jeor estimate. When sex is not supplied, use the midpoint
+      // of the male and female constants instead of blocking the recommendation.
+      const sexConstant =
+        normalizedSex === "male"
+          ? 5
+          : normalizedSex === "female"
+            ? -161
+            : -78;
+
+      const bmr =
+        10 * safeWeightKg +
+        6.25 * safeHeightCm -
+        5 * safeAge +
+        sexConstant;
+
+      const activityFactors: Record<string, number> = {
+        sedentary: 1.2,
+        moderate: 1.55,
+        active: 1.725,
+      };
+
+      const maintenanceCalories = Math.round(
+        bmr * (activityFactors[lifestyle] || 1.55),
+      );
+
+      let recommendedCalories = maintenanceCalories;
+
+      // Recommended mode starts from a clean, balanced profile. Existing
+      // optional diet and food-preference filters are not carried forward,
+      // because combinations of many optional filters can leave the backend
+      // with no usable dishes. Allergies and religious restrictions remain
+      // untouched and continue to be treated as hard requirements.
+      let recommendedDiet = "";
+      let sodiumMg = 2300;
+      let saturatedFatMaxG: number | undefined;
+
+      const recommendedFoodPreferences = new Set<string>(["home_cooked"]);
+      const notes: string[] = [];
+      const removedOptionalRestrictions: string[] = [];
+
+      const currentDiet = normalizeDietValue(diet);
+      if (currentDiet) {
+        removedOptionalRestrictions.push(
+          PH_COMMON_DIETS.find((option) => option.value === currentDiet)?.label ||
+            currentDiet,
+        );
+      }
+
+      foodPreferences.forEach((preference) => {
+        if (preference !== "home_cooked") {
+          removedOptionalRestrictions.push(
+            FOOD_PREFERENCES.find((option) => option.value === preference)
+              ?.label || preference,
+          );
+        }
+      });
+      const appliedConditions = healthConditions
+        .map(normalizeHealthConditionValue)
+        .filter(Boolean);
+
+      const hasCondition = (condition: string) =>
+        appliedConditions.includes(condition);
+
+      if (hasCondition("obesity_overweight")) {
+        recommendedCalories = Math.round(maintenanceCalories * 0.9);
+        recommendedFoodPreferences.add("high_fiber");
+        recommendedFoodPreferences.add("vegetable_forward");
+        recommendedFoodPreferences.add("no_fried_foods");
+        notes.push(
+          "Calories were set about 10% below estimated maintenance as a moderate starting point.",
+        );
+        notes.push(
+          "Higher-fiber foods, vegetables, lean protein, and less-fried cooking methods were prioritized.",
+        );
+      }
+
+      if (hasCondition("hypertension")) {
+        sodiumMg = Math.min(sodiumMg, 1500);
+        recommendedFoodPreferences.add("low_sodium");
+        recommendedFoodPreferences.add("vegetable_forward");
+        recommendedFoodPreferences.add("no_fried_foods");
+        notes.push(
+          "A lower-sodium eating pattern was applied with a 1,500 mg daily sodium recommendation.",
+        );
+      }
+
+      if (hasCondition("diabetes")) {
+        recommendedFoodPreferences.add("high_fiber");
+        recommendedFoodPreferences.add("vegetable_forward");
+        recommendedFoodPreferences.add("no_fried_foods");
+        notes.push(
+          "Carbohydrate foods should be divided consistently across meals and paired with protein, vegetables, or fiber.",
+        );
+        notes.push(
+          "Sugar-sweetened drinks and heavily sweetened foods should be avoided.",
+        );
+      }
+
+      if (hasCondition("dyslipidemia_cardiovascular")) {
+        recommendedFoodPreferences.add("high_fiber");
+        recommendedFoodPreferences.add("vegetable_forward");
+        recommendedFoodPreferences.add("no_fried_foods");
+        notes.push(
+          "Lean proteins, fiber-rich foods, unsaturated fats, and less-fried meals were prioritized.",
+        );
+      }
+
+      if (hasCondition("chronic_kidney_disease")) {
+        sodiumMg = Math.min(sodiumMg, 2000);
+        recommendedFoodPreferences.add("low_sodium");
+        recommendedFoodPreferences.add("no_fried_foods");
+
+        // General CKD mode deliberately avoids prescribing individualized
+        // protein, potassium, phosphorus, or fluid limits.
+        if (recommendedDiet === "high_protein") recommendedDiet = "";
+        notes.push(
+          "General CKD guidance favors lower-sodium, minimally processed foods and does not automatically use a high-protein plan.",
+        );
+        notes.push(
+          "Potassium, phosphorus, fluid, and kidney-specific protein limits were not prescribed because clinical CKD information is not collected.",
+        );
+      }
+
+      recommendedCalories = Math.round(
+        boundedNumber(recommendedCalories, calorieTarget, 1200, 5000),
+      );
+
+      const profile =
+        DIET_MACRO_PROFILES[recommendedDiet || "balanced"] ??
+        DIET_MACRO_PROFILES.balanced;
+
+      const protein = Number(
+        ((recommendedCalories * (profile.proteinPercent / 100)) / 4).toFixed(
+          2,
+        ),
+      );
+      const fats = Number(
+        ((recommendedCalories * (profile.fatsPercent / 100)) / 9).toFixed(2),
+      );
+      let carbs = Number(
+        ((recommendedCalories * (profile.carbsPercent / 100)) / 4).toFixed(
+          2,
+        ),
+      );
+
+      const calculatedCalories = protein * 4 + carbs * 4 + fats * 9;
+      carbs = Math.max(
+        0,
+        Number(
+          (carbs + (recommendedCalories - calculatedCalories) / 4).toFixed(
+            2,
+          ),
+        ),
+      );
+
+      if (hasCondition("dyslipidemia_cardiovascular")) {
+        saturatedFatMaxG = Number(
+          ((recommendedCalories * 0.06) / 9).toFixed(1),
+        );
+      }
+
+      return {
+        calories: recommendedCalories,
+        protein,
+        carbs,
+        fats,
+        sodiumMg,
+        saturatedFatMaxG,
+        diet: recommendedDiet,
+        foodPreferences: Array.from(recommendedFoodPreferences),
+        notes,
+        appliedConditions,
+        removedOptionalRestrictions: Array.from(
+          new Set(removedOptionalRestrictions),
+        ),
+      };
+    };
+
+  const validateRecommendationInputs = (): boolean => {
+    if (healthConditions.length === 0) {
+      presentToast({
+        message: "Select at least one health condition first.",
+        duration: 2500,
+        color: "warning",
+      });
+      return false;
+    }
+
+    if (
+      !Number.isFinite(Number(age)) ||
+      !Number.isFinite(Number(heightCm)) ||
+      !Number.isFinite(Number(weightKg)) ||
+      Number(age) <= 0 ||
+      Number(heightCm) <= 0 ||
+      Number(weightKg) <= 0
+    ) {
+      presentToast({
+        message:
+          "Enter a valid age, height, and weight before applying recommendations.",
+        duration: 3000,
+        color: "warning",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const previewRecommendedNutritionTargets = () => {
+    if (!validateRecommendationInputs()) return;
+
+    const recommendation = calculateRecommendedNutritionTargets();
+    setRecommendedTargets(recommendation);
+    setRecommendedSetupApplied(false);
+
+    presentToast({
+      message: "Recommended targets are ready. Review and apply the setup.",
+      duration: 2500,
+      color: "primary",
+    });
+  };
+
+  const applyRecommendedNutritionSetup = () => {
+    if (!validateRecommendationInputs()) return;
+
+    const recommendation =
+      recommendedTargets ?? calculateRecommendedNutritionTargets();
+
+    setCalorieTarget(recommendation.calories);
+    setDiet(recommendation.diet);
+
+    // Replace optional preferences instead of merging them. This removes
+    // conflicting optional filters that commonly cause an empty dish pool.
+    setFoodPreferences(recommendation.foodPreferences);
+    setRecommendedTargets(recommendation);
+    setRecommendedSetupApplied(true);
+
+    presentToast({
+      message:
+        "Recommended setup applied. Optional diet filters were cleared; allergies and religious restrictions were preserved.",
+      duration: 3500,
+      color: "success",
+    });
+  };
+
   // Calories remain user-controlled. Protein, carbohydrate, and fat targets
   // are derived automatically from the selected Diet Type.
   const getCalorieAlignedTargets = () => {
@@ -827,12 +1137,26 @@ const MealPlanner: React.FC = () => {
       protein,
       carbs,
       fats,
+      sodiumMg:
+        recommendedTargets?.sodiumMg ??
+        (healthConditions.includes("hypertension")
+          ? 1500
+          : healthConditions.includes("chronic_kidney_disease")
+            ? 2000
+            : 2300),
+      saturatedFatMaxG: recommendedTargets?.saturatedFatMaxG ?? null,
       macroProfile: normalizedDiet || "balanced",
       macroPercentages: {
         protein: profile.proteinPercent,
         carbs: profile.carbsPercent,
         fats: profile.fatsPercent,
       },
+      recommendationSource: recommendedTargets
+        ? "health_condition_recommendation_button"
+        : "manual_user_input",
+      recommendationNotes: recommendedTargets?.notes ?? [],
+      recommendedForConditions:
+        recommendedTargets?.appliedConditions ?? healthConditions,
     };
   };
 
@@ -854,7 +1178,7 @@ const MealPlanner: React.FC = () => {
       },
       dietaryRestrictions: {
         cultural: culturalContext,
-        religious: religiousRestriction,
+        religious: normalizeReligiousRestrictionValue(religiousRestriction),
         foodPreferences,
       },
       socioeconomic: {
@@ -872,6 +1196,14 @@ const MealPlanner: React.FC = () => {
       caloriePolicy: {
         enforceDailyTarget: true,
         toleranceKcal: 0,
+      },
+      recommendationPolicy: {
+        enabled: recommendedSetupApplied,
+        mode: recommendedSetupApplied ? "general_wellness" : "strict",
+        clearOptionalDietRestrictions: recommendedSetupApplied,
+        relaxHealthConditionHardBlocks: recommendedSetupApplied,
+        preserveAllergies: true,
+        preserveReligiousRestrictions: true,
       },
     };
   };
@@ -930,10 +1262,32 @@ const MealPlanner: React.FC = () => {
         );
       }
 
-      if (!resp.ok) {
+      if (!resp.ok && json?.mealPlan) {
+        console.warn(
+          "Backend returned a usable fallback plan with a warning status:",
+          json,
+        );
+      } else if (!resp.ok) {
         // Prefer server-sent message, fallback to status text
+        const validationDetails = Array.isArray(json?.errors)
+          ? json.errors.map(String).filter(Boolean).join(" ")
+          : "";
+        const violationDetails = Array.isArray(json?.healthRuleViolations)
+          ? json.healthRuleViolations
+              .slice(0, 3)
+              .flatMap((item: any) =>
+                Array.isArray(item?.reasons) ? item.reasons.map(String) : [],
+              )
+              .join(" ")
+          : "";
         const msg =
-          json?.message ||
+          [
+            json?.message,
+            validationDetails,
+            violationDetails,
+          ]
+            .filter(Boolean)
+            .join(" ") ||
           json?.error ||
           resp.statusText ||
           `Request failed (${resp.status})`;
@@ -1177,6 +1531,11 @@ const MealPlanner: React.FC = () => {
       minute: "2-digit",
     });
   };
+
+  useEffect(() => {
+    setRecommendedTargets(null);
+    setRecommendedSetupApplied(false);
+  }, [healthConditions]);
 
   useEffect(() => {
     let active = true;
@@ -2277,7 +2636,7 @@ const MealPlanner: React.FC = () => {
           targets: getCalorieAlignedTargets(),
           dietaryRestrictions: {
             cultural: culturalContext,
-            religious: religiousRestriction,
+            religious: normalizeReligiousRestrictionValue(religiousRestriction),
             foodPreferences: [...foodPreferences],
           },
           socioeconomic: {
@@ -2979,6 +3338,312 @@ const MealPlanner: React.FC = () => {
           margin-top: 0;
         }
 
+
+        /* Recommendation panel - follows the dark green MealPlanner.css UI */
+        .recommended-targets-button {
+          width: 100%;
+          min-height: 52px;
+          margin-top: 14px;
+          --background: transparent;
+          --background-hover: rgba(0, 230, 118, 0.1);
+          --background-activated: rgba(0, 230, 118, 0.14);
+          --border-color: rgba(0, 230, 118, 0.55);
+          --border-radius: 12px;
+          --border-style: solid;
+          --border-width: 1px;
+          --color: #00e676;
+          --box-shadow: none;
+          font-weight: 750;
+          letter-spacing: 0.01em;
+          text-transform: none;
+        }
+
+        .recommended-targets-button:hover:not(.button-disabled) {
+          --border-color: #00e676;
+          --background: rgba(0, 230, 118, 0.1);
+          --color: #7efc6a;
+          box-shadow: 0 6px 20px rgba(0, 230, 118, 0.12);
+        }
+
+        .recommended-targets-button.button-disabled {
+          opacity: 0.46;
+        }
+
+        .recommended-targets-summary {
+          width: 100%;
+          margin-top: 16px;
+          padding: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(0, 230, 118, 0.24);
+          border-left: 4px solid #00e676;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #181818 0%, #232323 100%);
+          color: #ffffff;
+          box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+          animation: slideUp 0.35s ease-out;
+        }
+
+        .recommended-targets-heading {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 5px;
+          color: #ffffff;
+          font-size: 1rem;
+          line-height: 1.35;
+        }
+
+        .recommended-targets-heading ion-icon {
+          width: 23px;
+          height: 23px;
+          flex: 0 0 23px;
+          color: #00e676;
+          filter: drop-shadow(0 0 8px rgba(0, 230, 118, 0.28));
+        }
+
+        .recommended-targets-heading strong {
+          color: #ffffff;
+          font-size: 1.05rem;
+          font-weight: 800;
+        }
+
+        .recommended-targets-subtitle {
+          margin: 0 0 14px;
+          color: #b0b0b0;
+          font-size: 0.84rem;
+          line-height: 1.5;
+        }
+
+        .recommended-targets-grid {
+          --ion-grid-padding: 0;
+          --ion-grid-column-padding: 5px;
+          padding: 0;
+        }
+
+        .recommended-targets-grid ion-row {
+          margin: 0 -5px;
+        }
+
+        .recommended-targets-grid ion-col {
+          padding: 5px;
+        }
+
+        .recommended-target-item {
+          display: flex;
+          min-height: 82px;
+          padding: 12px;
+          flex-direction: column;
+          justify-content: center;
+          gap: 5px;
+          border: 1px solid rgba(126, 252, 106, 0.16);
+          border-radius: 11px;
+          background: rgba(0, 230, 118, 0.055);
+          color: #ffffff;
+          box-shadow: inset 0 0 14px rgba(0, 230, 118, 0.025);
+          transition: transform 0.2s ease, border-color 0.2s ease,
+            background 0.2s ease;
+        }
+
+        .recommended-target-item:hover {
+          transform: translateY(-2px);
+          border-color: rgba(0, 230, 118, 0.48);
+          background: rgba(0, 230, 118, 0.09);
+        }
+
+        .recommended-target-item span {
+          color: #9bd8b4;
+          font-size: 0.72rem;
+          font-weight: 750;
+          letter-spacing: 0.045em;
+          text-transform: uppercase;
+        }
+
+        .recommended-target-item strong {
+          color: #ffffff;
+          font-size: 0.94rem;
+          font-weight: 800;
+          line-height: 1.35;
+          overflow-wrap: anywhere;
+        }
+
+        .recommended-target-notes-panel {
+          margin-top: 13px;
+          padding: 13px 14px;
+          border: 1px solid rgba(0, 230, 118, 0.15);
+          border-left: 3px solid #00e676;
+          border-radius: 11px;
+          background: rgba(0, 230, 118, 0.045);
+        }
+
+        .recommended-target-notes-title {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin: 0 0 8px;
+          color: #7efc6a;
+          font-size: 0.82rem;
+          font-weight: 800;
+          letter-spacing: 0.035em;
+          text-transform: uppercase;
+        }
+
+        .recommended-target-notes-title ion-icon {
+          width: 17px;
+          height: 17px;
+          color: #00e676;
+        }
+
+        .recommended-target-notes {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          color: #d4d4d4;
+        }
+
+        .recommended-target-notes li {
+          position: relative;
+          margin: 0 0 7px;
+          padding-left: 16px;
+          color: #d4d4d4;
+          font-size: 0.86rem;
+          line-height: 1.5;
+        }
+
+        .recommended-target-notes li::before {
+          content: "•";
+          position: absolute;
+          left: 0;
+          color: #00e676;
+          font-weight: 900;
+        }
+
+        .recommended-target-notes li:last-child {
+          margin-bottom: 0;
+        }
+
+        .recommended-removed-restrictions {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          margin-top: 13px;
+          padding: 12px 13px;
+          border: 1px solid rgba(255, 152, 0, 0.3);
+          border-left: 3px solid #ff9800;
+          border-radius: 11px;
+          color: #ffd79a;
+          background: rgba(255, 152, 0, 0.09);
+          font-size: 0.84rem;
+          line-height: 1.5;
+        }
+
+        .recommended-removed-restrictions ion-icon {
+          width: 18px;
+          height: 18px;
+          flex: 0 0 18px;
+          margin-top: 1px;
+          color: #ffb300;
+        }
+
+        .recommended-removed-restrictions strong {
+          color: #ffcc80;
+        }
+
+        .recommended-apply-button {
+          width: 100%;
+          min-height: 54px;
+          margin-top: 15px;
+          --background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+          --background-hover: linear-gradient(135deg, #00ff88 0%, #00e676 100%);
+          --background-activated: #00c853;
+          --border-radius: 12px;
+          --color: #000000;
+          --box-shadow: 0 5px 18px rgba(0, 230, 118, 0.28);
+          font-weight: 850;
+          letter-spacing: 0.01em;
+          text-transform: none;
+        }
+
+        .recommended-apply-button:hover {
+          transform: translateY(-1px);
+          --box-shadow: 0 7px 24px rgba(0, 230, 118, 0.4);
+        }
+
+        .recommended-apply-button.button-solid.ion-color-success {
+          --background: linear-gradient(135deg, #00c853 0%, #00a844 100%);
+          --color: #ffffff;
+        }
+
+        .recommended-mode-chip {
+          display: flex;
+          width: 100%;
+          margin: 12px 0 0;
+          padding: 11px 13px;
+          align-items: flex-start;
+          gap: 9px;
+          border: 1px solid rgba(0, 230, 118, 0.28);
+          border-left: 3px solid #00e676;
+          border-radius: 11px;
+          color: #d7f8e3;
+          background: rgba(0, 230, 118, 0.08);
+          font-size: 0.83rem;
+          line-height: 1.5;
+        }
+
+        .recommended-mode-chip ion-icon {
+          width: 18px;
+          height: 18px;
+          flex: 0 0 18px;
+          margin-top: 1px;
+          color: #00e676;
+        }
+
+        .recommended-mode-chip ion-label {
+          color: #d7f8e3 !important;
+          white-space: normal;
+        }
+
+        .recommended-target-disclaimer {
+          margin: 12px 0 0;
+          padding-top: 11px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          color: #9a9a9a;
+          font-size: 0.78rem;
+          font-style: italic;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 767px) {
+          .recommended-targets-summary {
+            padding: 14px;
+            border-radius: 14px;
+          }
+
+          .recommended-target-item {
+            min-height: 76px;
+            padding: 10px;
+          }
+
+          .recommended-target-item strong {
+            font-size: 0.88rem;
+          }
+        }
+
+        @media (max-width: 390px) {
+          .recommended-targets-grid ion-col {
+            flex: 0 0 100%;
+            width: 100%;
+            max-width: 100%;
+          }
+
+          .recommended-target-item {
+            min-height: 68px;
+          }
+
+          .recommended-targets-heading strong {
+            font-size: 0.98rem;
+          }
+        }
+
         @media (max-width: 767px) {
           .health-tip-grid {
             grid-template-columns: 1fr;
@@ -3227,26 +3892,25 @@ const MealPlanner: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <h3>Health Condition</h3>
+                  <h3>Health Conditions</h3>
 
                   <IonItem className="custom-item">
                     <IonLabel position="stacked">
-                      <IonIcon icon={warning} /> Condition
+                      <IonIcon icon={warning} /> Conditions
                     </IonLabel>
 
                     <IonSelect
-                      value={healthConditions[0] || ""}
-                      placeholder="Select a health condition"
-                      onIonChange={(e) => {
-                        const selectedCondition = e.detail.value as string;
-
+                      multiple
+                      value={healthConditions}
+                      placeholder="Select one or more health conditions"
+                      onIonChange={(e) =>
                         setHealthConditions(
-                          selectedCondition ? [selectedCondition] : [],
-                        );
-                      }}
+                          Array.isArray(e.detail.value)
+                            ? (e.detail.value as string[])
+                            : [],
+                        )
+                      }
                     >
-                      <IonSelectOption value="">None</IonSelectOption>
-
                       {HEALTH_CONDITIONS.map((option) => (
                         <IonSelectOption
                           key={option.value}
@@ -3261,13 +3925,160 @@ const MealPlanner: React.FC = () => {
                   {healthConditions.length > 0 && (
                     <div className="restriction-chip">
                       <IonIcon icon={checkmarkCircle} />
-
                       <IonLabel>
-                        {HEALTH_CONDITIONS.find(
-                          (option) => option.value === healthConditions[0],
-                        )?.label || "Health condition"}{" "}
-                        applied
+                        {healthConditions
+                          .map(
+                            (condition) =>
+                              HEALTH_CONDITIONS.find(
+                                (option) => option.value === condition,
+                              )?.label || condition,
+                          )
+                          .join(", ")} applied
                       </IonLabel>
+                    </div>
+                  )}
+
+                  <IonButton
+                    expand="block"
+                    fill="outline"
+                    color="primary"
+                    onClick={previewRecommendedNutritionTargets}
+                    disabled={healthConditions.length === 0}
+                    className="recommended-targets-button"
+                  >
+                    <IonIcon icon={sparkles} slot="start" />
+                    Show Recommended Targets
+                  </IonButton>
+
+                  {recommendedTargets && (
+                    <div className="recommended-targets-summary" aria-live="polite">
+                      <div className="recommended-targets-heading">
+                        <IonIcon icon={sparkles} />
+                        <strong>Recommended Nutrition Targets</strong>
+                      </div>
+                      <p className="recommended-targets-subtitle">
+                        Review the suggested values before applying them to your
+                        nutrition profile.
+                      </p>
+
+                      <IonGrid className="recommended-targets-grid">
+                        <IonRow>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Calories</span>
+                              <strong>{recommendedTargets.calories} kcal</strong>
+                            </div>
+                          </IonCol>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Protein</span>
+                              <strong>
+                                {recommendedTargets.protein.toFixed(2)} g
+                              </strong>
+                            </div>
+                          </IonCol>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Carbohydrates</span>
+                              <strong>
+                                {recommendedTargets.carbs.toFixed(2)} g
+                              </strong>
+                            </div>
+                          </IonCol>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Fats</span>
+                              <strong>
+                                {recommendedTargets.fats.toFixed(2)} g
+                              </strong>
+                            </div>
+                          </IonCol>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Sodium Limit</span>
+                              <strong>{recommendedTargets.sodiumMg} mg</strong>
+                            </div>
+                          </IonCol>
+                          <IonCol size="6" sizeMd="3">
+                            <div className="recommended-target-item">
+                              <span>Diet Pattern</span>
+                              <strong>
+                                {PH_COMMON_DIETS.find(
+                                  (option) =>
+                                    option.value === recommendedTargets.diet,
+                                )?.label || "Balanced"}
+                              </strong>
+                            </div>
+                          </IonCol>
+                          {recommendedTargets.saturatedFatMaxG !==
+                            undefined && (
+                            <IonCol size="6" sizeMd="3">
+                              <div className="recommended-target-item">
+                                <span>Saturated Fat Limit</span>
+                                <strong>
+                                  {recommendedTargets.saturatedFatMaxG} g
+                                </strong>
+                              </div>
+                            </IonCol>
+                          )}
+                        </IonRow>
+                      </IonGrid>
+
+                      {recommendedTargets.notes.length > 0 && (
+                        <div className="recommended-target-notes-panel">
+                          <div className="recommended-target-notes-title">
+                            <IonIcon icon={bulb} />
+                            Why these targets are recommended
+                          </div>
+                          <ul className="recommended-target-notes">
+                            {recommendedTargets.notes.map((note, index) => (
+                              <li key={index}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {recommendedTargets.removedOptionalRestrictions.length >
+                        0 && (
+                        <div className="recommended-removed-restrictions">
+                          <IonIcon icon={warning} />
+                          <div>
+                            <strong>Optional filters to be replaced:</strong>{" "}
+                            {recommendedTargets.removedOptionalRestrictions.join(
+                              ", ",
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <IonButton
+                        expand="block"
+                        color={recommendedSetupApplied ? "success" : "primary"}
+                        onClick={applyRecommendedNutritionSetup}
+                        className="recommended-apply-button"
+                      >
+                        <IonIcon icon={checkmarkCircle} slot="start" />
+                        {recommendedSetupApplied
+                          ? "Recommended Setup Applied"
+                          : "Apply Recommended Setup & Remove Conflicts"}
+                      </IonButton>
+
+                      {recommendedSetupApplied && (
+                        <div className="recommended-mode-chip" role="status">
+                          <IonIcon icon={checkmarkCircle} />
+                          <IonLabel>
+                            General recommendation mode is active. Medical
+                            conditions guide meal selection without blocking
+                            generation. Allergies and religious restrictions
+                            remain enforced.
+                          </IonLabel>
+                        </div>
+                      )}
+
+                      <p className="recommended-target-disclaimer">
+                        These are general meal-planning suggestions and are not
+                        a medical prescription.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -3282,7 +4093,10 @@ const MealPlanner: React.FC = () => {
                       </IonLabel>
                       <IonSelect
                         value={diet}
-                        onIonChange={(e) => setDiet(e.detail.value!)}
+                        onIonChange={(e) => {
+                          setDiet(e.detail.value!);
+                          setRecommendedSetupApplied(false);
+                        }}
                       >
                         {PH_COMMON_DIETS.map((opt) => (
                           <IonSelectOption
@@ -3331,9 +4145,12 @@ const MealPlanner: React.FC = () => {
                       </IonLabel>
                       <IonSelect
                         value={religiousRestriction}
-                        onIonChange={(e) =>
-                          setReligiousRestriction(e.detail.value || "")
-                        }
+                        onIonChange={(e) => {
+                          setReligiousRestriction(
+                            normalizeReligiousRestrictionValue(e.detail.value),
+                          );
+                          setRecommendedSetupApplied(false);
+                        }}
                       >
                         {RELIGIOUS_RESTRICTIONS.map((opt) => (
                           <IonSelectOption
@@ -3354,9 +4171,10 @@ const MealPlanner: React.FC = () => {
                         multiple
                         value={foodPreferences}
                         placeholder="Select preferences"
-                        onIonChange={(e) =>
-                          setFoodPreferences((e.detail.value as string[]) || [])
-                        }
+                        onIonChange={(e) => {
+                          setFoodPreferences((e.detail.value as string[]) || []);
+                          setRecommendedSetupApplied(false);
+                        }}
                       >
                         {FOOD_PREFERENCES.map((opt) => (
                           <IonSelectOption key={opt.value} value={opt.value}>

@@ -132,7 +132,7 @@ function mealPlannerGoalRules(goal: unknown, profile?: any): string {
       return [
         'Goal strategy: strength or muscle support under CKD safety limits.',
         'Do not use a generic high-protein or bodybuilding plan.',
-        'The CKD stage, dialysis status, metabolic stability, reference weight, and clinician-prescribed targets override the normal muscle-gain protein rules.',
+        'CKD treatment status, metabolic stability, reference weight, and clinician-prescribed targets override the normal muscle-gain protein rules when those details are available.',
         'Provide adequate energy and distribute only the allowed protein amount across the requested meals.'
       ].join(' ');
     }
@@ -915,7 +915,7 @@ function uniqueStrings(values: any[]): string[] {
 }
 
 function normalizeTokenValue(input: any): string {
-  return String(input || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return String(input || '').trim().toLowerCase().replace(/[\s/()-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 }
 
 function normalizeHealthConditions(input: any): string[] {
@@ -986,13 +986,11 @@ function getRestrictionTokensFromProfile(dietaryRestrictions: any, healthConditi
 }
 
 
-type MealPlannerCkdStage = 'G1' | 'G2' | 'G3A' | 'G3B' | 'G4' | 'G5';
 type MealPlannerCkdTreatment = 'not_on_dialysis' | 'hemodialysis' | 'peritoneal_dialysis' | 'kidney_transplant';
 type MealPlannerLabStatus = 'low' | 'normal' | 'high' | 'unknown';
 
 type MealPlannerCkdProfile = {
   enabled: boolean;
-  stage: MealPlannerCkdStage | null;
   treatment: MealPlannerCkdTreatment | null;
   metabolicallyStable: boolean | null;
   referenceWeightKg: number | null;
@@ -1033,25 +1031,6 @@ function mealPlannerOptionalBoolean(value: any): boolean | null {
   return null;
 }
 
-function normalizeMealPlannerCkdStage(value: any): MealPlannerCkdStage | null {
-  const token = String(value ?? '')
-    .trim()
-    .toUpperCase()
-    .replace(/STAGE/g, '')
-    .replace(/CKD/g, '')
-    .replace(/[\s_-]+/g, '');
-
-  const aliases: Record<string, MealPlannerCkdStage> = {
-    '1': 'G1', G1: 'G1',
-    '2': 'G2', G2: 'G2',
-    '3A': 'G3A', G3A: 'G3A',
-    '3B': 'G3B', G3B: 'G3B',
-    '4': 'G4', G4: 'G4',
-    '5': 'G5', G5: 'G5',
-  };
-
-  return aliases[token] || null;
-}
 
 function normalizeMealPlannerCkdTreatment(value: any): MealPlannerCkdTreatment | null {
   const token = normalizeTokenValue(value);
@@ -1070,53 +1049,34 @@ function normalizeMealPlannerLabStatus(value: any): MealPlannerLabStatus {
   return 'unknown';
 }
 
-function buildMealPlannerCkdProfile(reqBody: any, healthConditions: string[], submittedWeightKg: number | null): MealPlannerCkdProfile {
+function buildMealPlannerCkdProfile(
+  _reqBody: any,
+  healthConditions: string[],
+  submittedWeightKg: number | null
+): MealPlannerCkdProfile {
   const enabled = healthConditions.includes('chronic_kidney_disease');
-  const raw = reqBody?.ckdProfile && typeof reqBody.ckdProfile === 'object'
-    ? reqBody.ckdProfile
-    : reqBody?.clinicalProfile?.ckd && typeof reqBody.clinicalProfile.ckd === 'object'
-      ? reqBody.clinicalProfile.ckd
-      : {};
+  const referenceWeightKg = enabled
+    ? mealPlannerOptionalPositiveNumber(submittedWeightKg)
+    : null;
 
-  const idealWeightKg = mealPlannerOptionalPositiveNumber(raw.idealBodyWeightKg ?? reqBody?.idealBodyWeightKg);
-  const actualWeightKg = mealPlannerOptionalPositiveNumber(raw.weightKg ?? submittedWeightKg ?? reqBody?.weightKg);
-
+  // CKD is intentionally handled as a general health condition. The API no
+  // longer collects treatment, dialysis, laboratory, or prescribed-limit
+  // fields from the member-facing Meal Planner.
   return {
     enabled,
-    stage: enabled ? normalizeMealPlannerCkdStage(raw.stage ?? reqBody?.ckdStage) : null,
-    treatment: enabled
-      ? normalizeMealPlannerCkdTreatment(raw.treatment ?? raw.dialysisStatus ?? reqBody?.dialysisStatus)
-      : null,
-    metabolicallyStable: enabled
-      ? mealPlannerOptionalBoolean(raw.metabolicallyStable ?? reqBody?.metabolicallyStable)
-      : null,
-    referenceWeightKg: enabled ? (idealWeightKg ?? actualWeightKg) : null,
-    referenceWeightType: enabled ? (idealWeightKg ? 'ideal' : (actualWeightKg ? 'submitted' : null)) : null,
-    serumPotassiumStatus: enabled
-      ? normalizeMealPlannerLabStatus(raw.serumPotassiumStatus ?? raw.potassiumStatus ?? reqBody?.serumPotassiumStatus)
-      : 'unknown',
-    serumPhosphorusStatus: enabled
-      ? normalizeMealPlannerLabStatus(raw.serumPhosphorusStatus ?? raw.phosphorusStatus ?? reqBody?.serumPhosphorusStatus)
-      : 'unknown',
-    prescribedProteinGrams: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedProteinGrams ?? reqBody?.prescribedProteinGrams)
-      : null,
-    prescribedProteinGPerKg: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedProteinGPerKg ?? reqBody?.prescribedProteinGPerKg)
-      : null,
-    prescribedSodiumMg: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedSodiumMg ?? reqBody?.prescribedSodiumMg)
-      : null,
-    prescribedPotassiumMg: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedPotassiumMg ?? reqBody?.prescribedPotassiumMg)
-      : null,
-    prescribedPhosphorusMg: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedPhosphorusMg ?? reqBody?.prescribedPhosphorusMg)
-      : null,
-    prescribedFluidLimitMl: enabled
-      ? mealPlannerOptionalPositiveNumber(raw.prescribedFluidLimitMl ?? raw.fluidLimitMl ?? reqBody?.prescribedFluidLimitMl)
-      : null,
-    clinicianNotes: enabled ? String(raw.clinicianNotes ?? reqBody?.ckdClinicianNotes ?? '').trim().slice(0, 1000) : '',
+    treatment: null,
+    metabolicallyStable: null,
+    referenceWeightKg,
+    referenceWeightType: referenceWeightKg ? 'submitted' : null,
+    serumPotassiumStatus: 'unknown',
+    serumPhosphorusStatus: 'unknown',
+    prescribedProteinGrams: null,
+    prescribedProteinGPerKg: null,
+    prescribedSodiumMg: null,
+    prescribedPotassiumMg: null,
+    prescribedPhosphorusMg: null,
+    prescribedFluidLimitMl: null,
+    clinicianNotes: '',
   };
 }
 
@@ -1166,71 +1126,62 @@ function buildMealPlannerHealthRuleContext(profile: any, requestedTargets: any, 
   }
 
   if (ckd?.enabled) {
-    if (!ckd.stage) validationErrors.push('CKD stage is required: G1, G2, G3A, G3B, G4, or G5.');
-    if (!ckd.treatment) validationErrors.push('CKD treatment status is required: not_on_dialysis, hemodialysis, peritoneal_dialysis, or kidney_transplant.');
-    if (!ckd.referenceWeightKg) validationErrors.push('A valid body weight in kilograms is required to calculate the CKD protein target.');
-    if (ckd.metabolicallyStable === null) validationErrors.push('CKD metabolic stability must be specified.');
-    if (ckd.metabolicallyStable === false && !ckd.prescribedProteinGrams && !ckd.prescribedProteinGPerKg) {
-      validationErrors.push('A clinician-prescribed protein target is required when the CKD patient is not metabolically stable.');
-    }
-    if (ckd.treatment === 'kidney_transplant' && !ckd.prescribedProteinGrams && !ckd.prescribedProteinGPerKg) {
-      validationErrors.push('A clinician-prescribed protein target is required for kidney-transplant meal planning.');
-    }
-
+    // General CKD mode: no stage, dialysis, laboratory, or prescribed-limit
+    // information is requested from the member.
     if (effectiveDiet === 'high_protein') {
       effectiveDiet = '';
       Object.assign(targets, deriveMealPlannerTargetsFromDiet(targets, effectiveDiet));
-      cautions.push('The selected high-protein diet was overridden because CKD protein targets take priority.');
+      cautions.push('The selected high-protein diet was changed to a balanced pattern because general CKD guidance should not force high protein.');
     }
 
-    if (ckd.referenceWeightKg) {
-      const isDialysis = ckd.treatment === 'hemodialysis' || ckd.treatment === 'peritoneal_dialysis';
-      const defaultGPerKg = isDialysis ? 1.1 : 0.8;
-      const prescribedGPerKg = ckd.prescribedProteinGPerKg;
-      const proteinGrams = Math.round(
-        ckd.prescribedProteinGrams
-        ?? ckd.referenceWeightKg * (prescribedGPerKg ?? defaultGPerKg)
-      );
-      targets.protein = proteinGrams;
-      targets.ckdProteinGPerKg = Math.round((proteinGrams / ckd.referenceWeightKg) * 100) / 100;
-      targets.ckdReferenceWeightKg = ckd.referenceWeightKg;
-      targets.ckdProteinTargetSource = ckd.prescribedProteinGrams || prescribedGPerKg
-        ? 'clinician_prescribed'
-        : isDialysis ? 'dialysis_default' : 'non_dialysis_default';
-      limits.dailyProtein = proteinGrams;
-      limits.mainMealProteinCap = Math.max(6, Math.round(proteinGrams * 0.38));
-      limits.snackProteinCap = Math.max(2, Math.round(proteinGrams * 0.12));
-    }
+    const referenceWeightKg = mealPlannerOptionalPositiveNumber(
+      profile?.demographics?.weightKg ?? ckd.referenceWeightKg
+    );
+    const currentProteinTarget = mealPlannerOptionalPositiveNumber(targets.protein);
+    const generalProteinTarget = referenceWeightKg
+      ? Math.max(30, Math.round(referenceWeightKg * 0.8))
+      : Math.max(40, Math.round(((targets.calories ?? 2000) * 0.15) / 4));
 
-    targets.sodiumMg = Math.round(ckd.prescribedSodiumMg ?? Math.min(mealPlannerOptionalPositiveNumber(targets.sodiumMg) ?? 2000, 2000));
+    targets.protein = currentProteinTarget
+      ? Math.min(currentProteinTarget, generalProteinTarget)
+      : generalProteinTarget;
+    targets.ckdProteinTargetSource = 'general_ckd_guidance';
+    limits.dailyProtein = targets.protein;
+    limits.mainMealProteinCap = Math.max(6, Math.round(targets.protein * 0.38));
+    limits.snackProteinCap = Math.max(2, Math.round(targets.protein * 0.12));
+
+    targets.sodiumMg = Math.min(
+      Math.round(mealPlannerOptionalPositiveNumber(targets.sodiumMg) ?? 2000),
+      2000
+    );
+    targets.potassiumMg = null;
+    targets.phosphorusMg = null;
+    targets.fluidLimitMl = null;
     limits.sodiumMg = targets.sodiumMg;
-    targets.potassiumMg = ckd.prescribedPotassiumMg ?? targets.potassiumMg ?? null;
-    targets.phosphorusMg = ckd.prescribedPhosphorusMg ?? targets.phosphorusMg ?? null;
-    targets.fluidLimitMl = ckd.prescribedFluidLimitMl ?? targets.fluidLimitMl ?? null;
 
-    hardAvoidKeywords.push('bagoong', 'patis', 'fish sauce', 'regular soy sauce', 'bouillon cube', 'instant noodles', 'canned meat', 'processed meat', 'salted fish', 'dilis', 'sardines');
-    if (ckd.serumPotassiumStatus === 'high' || ckd.prescribedPotassiumMg) {
-      hardAvoidKeywords.push('potassium salt substitute', 'coconut water', 'banana', 'saba banana', 'kamote', 'sweet potato', 'potato', 'avocado');
-    }
-    if (ckd.serumPhosphorusStatus === 'high' || ckd.prescribedPhosphorusMg) {
-      hardAvoidKeywords.push('cola', 'processed cheese', 'organ meat', 'chicken liver', 'protein powder', 'phosphate additive');
-    }
+    hardAvoidKeywords.push(
+      'bagoong',
+      'patis',
+      'fish sauce',
+      'regular soy sauce',
+      'bouillon cube',
+      'instant noodles',
+      'canned meat',
+      'processed meat',
+      'salted fish',
+      'protein powder',
+      'double protein'
+    );
 
-    promptRules.push(`CKD: stage ${ckd.stage || 'missing'}, treatment ${ckd.treatment || 'missing'}, metabolically stable ${ckd.metabolicallyStable === null ? 'missing' : ckd.metabolicallyStable ? 'yes' : 'no'}. Daily protein must stay near ${targets.protein ?? 'the clinician-prescribed'} g and sodium at or below ${targets.sodiumMg} mg. A muscle-gain or high-protein goal must never override this limit.`);
-    promptRules.push(ckd.prescribedPotassiumMg
-      ? `Keep potassium near the clinician-prescribed ${Math.round(ckd.prescribedPotassiumMg)} mg/day.`
-      : ckd.serumPotassiumStatus === 'high'
-        ? 'Use lower-potassium choices and avoid potassium-based salt substitutes.'
-        : 'Do not impose a blanket potassium restriction because no high laboratory result or prescribed limit was supplied.');
-    promptRules.push(ckd.prescribedPhosphorusMg
-      ? `Keep phosphorus near the clinician-prescribed ${Math.round(ckd.prescribedPhosphorusMg)} mg/day.`
-      : ckd.serumPhosphorusStatus === 'high'
-        ? 'Reduce phosphate additives and high-phosphorus processed foods.'
-        : 'Do not impose a blanket phosphorus restriction because no high laboratory result or prescribed limit was supplied.');
-    promptRules.push(ckd.prescribedFluidLimitMl
-      ? `Keep listed fluids within the clinician-prescribed ${Math.round(ckd.prescribedFluidLimitMl)} ml/day.`
-      : 'Do not invent a fluid restriction; fluid limits require kidney-team direction.');
-    cautions.push('CKD meal plans require nephrologist or renal-dietitian review, especially when potassium, phosphorus, fluid, nutrition status, or dialysis needs change.');
+    promptRules.push(
+      `General CKD guidance: use moderate measured protein near ${targets.protein} g/day and keep sodium at or below ${targets.sodiumMg} mg/day. Do not use a high-protein or bodybuilding pattern.`
+    );
+    promptRules.push(
+      'Do not apply automatic potassium, phosphorus, or fluid restrictions because no individualized clinical information is collected.'
+    );
+    cautions.push(
+      'This is general CKD-aware meal guidance only. Individual protein, potassium, phosphorus, sodium, and fluid needs must be set by a nephrologist or renal dietitian.'
+    );
   }
 
   return {
@@ -1292,6 +1243,15 @@ function normalizeMealPlannerProfile(reqBody: any, normalizedDiet: string, allRe
     } | null,
     restrictionTokens: allRestrictionTokens,
   };
+}
+
+function getMealPlannerClinicalRequiredFields(
+  _profile: any,
+  _healthConditions: string[]
+): string[] {
+  // The member-facing Meal Planner no longer requests separate CKD clinical
+  // information. CKD uses general guidance and therefore has no extra fields.
+  return [];
 }
 
 function getCitationIdsForProfile(profile: any, hasAllergies: boolean): string[] {
@@ -2895,61 +2855,35 @@ function buildMealPlannerHealthConditionTips(
   }
 
   if (conditions.includes('chronic_kidney_disease')) {
-    const ckd = context.ckdProfile;
     const proteinTarget = context.effectiveTargets?.protein;
     const sodiumTarget = context.effectiveTargets?.sodiumMg ?? 2000;
-    const isDialysis = ckd?.treatment === 'hemodialysis' || ckd?.treatment === 'peritoneal_dialysis';
-    const potassiumRestricted = ckd?.serumPotassiumStatus === 'high' || !!ckd?.prescribedPotassiumMg;
-    const phosphorusRestricted = ckd?.serumPhosphorusStatus === 'high' || !!ckd?.prescribedPhosphorusMg;
-
-    const foodsToLimitOrAvoid = [
-      'bagoong, patis, regular soy sauce, salted fish, instant noodles, canned meat, and processed meat',
-      'protein powders, amino-acid supplements, and double-protein servings unless prescribed by the kidney team',
-    ];
-    if (potassiumRestricted) {
-      foodsToLimitOrAvoid.push('potassium salt substitutes and the high-potassium foods identified by the kidney team, such as coconut water, banana, potato, sweet potato, or avocado');
-    }
-    if (phosphorusRestricted) {
-      foodsToLimitOrAvoid.push('foods with phosphate additives, cola, processed cheese, organ meat, and other high-phosphorus foods identified by the kidney team');
-    }
-
-    const practicalTips = [
-      'Use the exact protein and serving weights shown in the plan instead of adding extra meat or supplements.',
-      'Check ingredient labels for sodium and words containing “phos” when phosphorus restriction is prescribed.',
-      potassiumRestricted
-        ? 'Follow the potassium limit supplied by the kidney team and current laboratory results.'
-        : 'Do not avoid all potassium-rich food automatically; potassium restriction depends on laboratory results and treatment.',
-      phosphorusRestricted
-        ? 'Follow the phosphorus limit supplied by the kidney team and current laboratory results.'
-        : 'Do not avoid all phosphorus-containing food automatically; phosphorus restriction depends on laboratory results and treatment.',
-      ckd?.prescribedFluidLimitMl
-        ? `Count drinks, soup, ice, and other liquids toward the prescribed ${Math.round(ckd.prescribedFluidLimitMl)} ml/day fluid limit.`
-        : 'Do not start a fluid restriction unless the kidney team has prescribed one.',
-    ];
 
     tips.push({
       condition: 'chronic_kidney_disease',
       label: 'Chronic Kidney Disease',
-      summary: `Kidney nutrition needs vary by CKD stage, dialysis status, laboratory values, metabolic stability, and nutrition status. This plan uses stage ${ckd?.stage || 'not supplied'} and treatment ${ckd?.treatment || 'not supplied'}.`,
+      summary: 'The plan applies general CKD-aware guidance without requesting stage, dialysis, laboratory, or prescribed-limit information.',
       whyMealPlanChanged: [
-        `Protein was limited to approximately ${proteinTarget ?? 'the prescribed target'} g/day${isDialysis ? ' for the selected dialysis treatment' : ' instead of using a generic high-protein target'}.`,
-        `Sodium was limited to approximately ${sodiumTarget} mg/day.`,
-        potassiumRestricted
-          ? 'Potassium-related foods were limited because a high result or prescribed target was supplied.'
-          : 'A blanket low-potassium diet was not applied because no high result or prescribed potassium target was supplied.',
-        phosphorusRestricted
-          ? 'Phosphorus-related foods were limited because a high result or prescribed target was supplied.'
-          : 'A blanket low-phosphorus diet was not applied because no high result or prescribed phosphorus target was supplied.',
+        `Protein was kept moderate at approximately ${proteinTarget ?? 'the calculated target'} g/day instead of using a high-protein pattern.`,
+        `Sodium was kept near or below ${sodiumTarget} mg/day using fresher and less-processed foods.`,
+        'Automatic potassium, phosphorus, and fluid restrictions were not applied because those limits require individualized clinical guidance.',
       ],
       foodsToPrioritize: [
         'fresh, minimally processed, lower-sodium foods',
-        'measured portions of the protein foods listed in the plan',
-        'rice, vegetables, and fruits that fit the current potassium and phosphorus instructions',
-        'herbs, garlic, ginger, vinegar, and calamansi instead of salty seasonings',
+        'measured portions of protein foods',
+        'vegetables, fruits, rice, and other foods that fit the member’s individualized kidney-care advice',
+        'garlic, ginger, herbs, vinegar, and calamansi instead of salty seasonings',
       ],
-      foodsToLimitOrAvoid,
-      practicalTips,
-      medicalNote: 'CKD meal plans must be reviewed as laboratory values, stage, dialysis treatment, appetite, body weight, swelling, and medicines change. A nephrologist or renal dietitian should set individualized protein, potassium, phosphorus, sodium, and fluid targets.',
+      foodsToLimitOrAvoid: [
+        'bagoong, patis, regular soy sauce, salted fish, instant noodles, canned meat, and processed meat',
+        'protein powders, amino-acid supplements, and double-protein servings unless prescribed by the kidney-care team',
+        'unprescribed salt substitutes or supplements marketed for kidney health',
+      ],
+      practicalTips: [
+        'Use the exact serving and ingredient amounts shown in the plan.',
+        'Check packaged-food labels for sodium per serving.',
+        'Do not start potassium, phosphorus, or fluid restriction without individualized advice.',
+      ],
+      medicalNote: 'General CKD guidance does not replace renal medical nutrition therapy. A nephrologist or renal dietitian should set individualized protein, potassium, phosphorus, sodium, and fluid targets.',
       citationIds: ['niddk_ckd', 'kdigo_2024_ckd', 'kdoqi_ckd_nutrition'],
     });
   }
@@ -3106,6 +3040,23 @@ function normalizeSelectionList(input: any): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function mealPlannerUsesRecommendationMode(reqBody: any): boolean {
+  const policy = reqBody?.recommendationPolicy;
+  if (!policy || typeof policy !== 'object') return false;
+  return policy.enabled === true && policy.relaxHealthConditionHardBlocks !== false;
+}
+
+function mealPlannerRemoveAdvisoryRestrictionTokens(tokens: string[]): string[] {
+  const advisoryOnly = new Set([
+    'low_sodium',
+    'low_sugar',
+    'no_fried_foods',
+    'budget_friendly',
+  ]);
+
+  return uniqueStrings(tokens).filter((token) => !advisoryOnly.has(token));
 }
 
 const MEAL_FILTER_KEYWORDS_BY_TOKEN: Record<string, string[]> = {
@@ -5384,8 +5335,6 @@ async function getUserMealPreferences(userId: number): Promise<any | null> {
       diet: prefJson?.diet ?? row.diet ?? null,
       allergies,
       healthConditions: Array.isArray(prefJson?.healthConditions) ? prefJson.healthConditions : [],
-      ckdProfile: prefJson?.ckdProfile ?? prefJson?.clinicalProfile?.ckd ?? null,
-      clinicalProfile: prefJson?.clinicalProfile ?? null,
       demographics: prefJson?.demographics ?? null,
       dietaryRestrictions: prefJson?.dietaryRestrictions ?? null,
       socioeconomic: prefJson?.socioeconomic ?? null,
@@ -5503,6 +5452,8 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
   try {
     const userId = req.user!.id;
     const { lifestyle, mealType, goal, diet, allergies, dietaryRestrictions, targets } = req.body;
+    const recommendationPolicy = req.body?.recommendationPolicy || {};
+    const recommendationMode = mealPlannerUsesRecommendationMode(req.body);
     const healthConditions = normalizeHealthConditions(req.body?.healthConditions || req.body?.healthCondition);
     const normalizedDietaryRestrictions = normalizeDietaryRestrictions(dietaryRestrictions);
     const inferredDiet = inferDietFromRestrictions(normalizedDietaryRestrictions);
@@ -5511,9 +5462,24 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     // by treating any provided dietaryRestrictions as additional "avoid" tokens.
     const allergyTokens = normalizeSelectionList(allergies);
     const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
-    const profileRestrictionTokens = getRestrictionTokensFromProfile(normalizedDietaryRestrictions, healthConditions);
-    const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens, ...profileRestrictionTokens]));
-    const normalizedDiet = normalizeDietType(diet || inferredDiet);
+    const rawProfileRestrictionTokens = getRestrictionTokensFromProfile(
+      normalizedDietaryRestrictions,
+      healthConditions
+    );
+    const profileRestrictionTokens = recommendationMode
+      ? mealPlannerRemoveAdvisoryRestrictionTokens(rawProfileRestrictionTokens)
+      : rawProfileRestrictionTokens;
+    const allRestrictionTokens = Array.from(
+      new Set([...allergyTokens, ...deprecatedRestrictionTokens, ...profileRestrictionTokens])
+    );
+    const requestedDiet = normalizeDietType(diet || inferredDiet);
+    const mustPreserveVegetarianRestriction =
+      normalizedDietaryRestrictions.religious === 'vegetarian';
+    const normalizedDiet = recommendationMode
+      && recommendationPolicy?.clearOptionalDietRestrictions
+      && !mustPreserveVegetarianRestriction
+      ? ''
+      : requestedDiet;
     const nutritionProfile = normalizeMealPlannerProfile(
       { ...(req.body || {}), healthConditions, dietaryRestrictions: normalizedDietaryRestrictions },
       normalizedDiet,
@@ -5523,11 +5489,15 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     if (healthRuleContext.validationErrors.length > 0) {
       return res.status(422).json({
         success: false,
-        message: 'More clinical information is required before a safe meal plan can be generated.',
+        message: 'The submitted profile could not be used to generate the requested meal plan.',
         errors: healthRuleContext.validationErrors,
-        requiredFields: healthConditions.includes('chronic_kidney_disease')
-          ? ['demographics.weightKg', 'ckdProfile.stage', 'ckdProfile.treatment', 'ckdProfile.metabolicallyStable']
-          : [],
+        requiredFields: getMealPlannerClinicalRequiredFields(
+          nutritionProfile,
+          healthConditions
+        ),
+        healthConditionsApplied: healthConditions,
+        combinationSupported: healthConditions.includes('obesity_overweight')
+          && healthConditions.includes('chronic_kidney_disease'),
         saved: false,
       });
     }
@@ -5554,13 +5524,22 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
         allergies: allergyTokens,
         healthConditions,
         demographics: nutritionProfile.demographics,
-        ckdProfile: nutritionProfile.ckdProfile,
         dietaryRestrictions: normalizedDietaryRestrictions,
         socioeconomic: nutritionProfile.socioeconomic,
         lifestyleFactors: nutritionProfile.lifestyleFactors,
         // keep deprecated field for older schemas/clients
         deprecatedDietaryRestrictions: deprecatedRestrictionTokens,
         targets: effectiveTargets,
+        recommendationPolicy: recommendationMode
+          ? {
+              enabled: true,
+              mode: 'general_wellness',
+              clearOptionalDietRestrictions: true,
+              relaxHealthConditionHardBlocks: true,
+              preserveAllergies: true,
+              preserveReligiousRestrictions: true,
+            }
+          : { enabled: false, mode: 'strict' },
       });
     } catch {
       // ignore preference persistence errors
@@ -5588,8 +5567,11 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
 
       weekPlan = enforceMealPlannerCkdProteinTargets(weekPlan, nutritionProfile, healthRuleContext);
       weekPlan = ensureWeekPlanServingMetadata(weekPlan);
-      const offlineHealthViolations = mealPlannerFindWeekPlanHealthRuleViolations(weekPlan, healthRuleContext);
-      if (offlineHealthViolations.length > 0) {
+      const offlineHealthViolations = mealPlannerFindWeekPlanHealthRuleViolations(
+        weekPlan,
+        healthRuleContext
+      );
+      if (offlineHealthViolations.length > 0 && !recommendationMode) {
         return res.status(503).json({
           success: false,
           message: 'Database is unavailable and the fallback plan could not satisfy the selected medical-condition safeguards.',
@@ -5598,12 +5580,17 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
           saved: false,
         });
       }
+      const offlineHealthRecommendationWarnings = recommendationMode
+        ? offlineHealthViolations
+        : [];
       weekPlan = enforceMealPlannerNutritionConsistency(weekPlan);
       weekPlan = recomputeWeekPlanTotals(weekPlan);
       weekPlan = annotateWeekPlanWithEvidence(weekPlan, nutritionProfile, citationIds);
-      return res.status(503).json({
-        success: false,
-        message: 'Database not connected — returning fallback plan',
+      return res.status(recommendationMode ? 200 : 503).json({
+        success: recommendationMode,
+        message: recommendationMode
+          ? 'Database not connected — generated a recommendation-mode fallback plan.'
+          : 'Database not connected — returning fallback plan',
         mealPlan: {
           weekPlan,
           shoppingList: generateShoppingList(weekPlan),
@@ -5612,8 +5599,12 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
           healthConditionTips,
           evidenceSummary,
           citations,
-          profileSummary: nutritionProfile
+          profileSummary: nutritionProfile,
+          recommendationModeApplied: recommendationMode,
+          healthRecommendationWarnings: offlineHealthRecommendationWarnings,
         },
+        recommendationModeApplied: recommendationMode,
+        healthRecommendationWarnings: offlineHealthRecommendationWarnings,
         saved: false
       });
     }
@@ -5623,14 +5614,19 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     // Apply best-effort filtering so restricted dishes are not offered to the AI.
     const tokenFilteredDbDishes = filterDishesByTokens(dbDishes || [], allRestrictionTokens);
     const dietFilteredDbDishes = filterDishesByDiet(tokenFilteredDbDishes, effectiveDiet);
-    const profileFilteredDbDishes = filterDishesByHealthProfile(
-      effectiveDiet ? dietFilteredDbDishes : tokenFilteredDbDishes,
-      nutritionProfile.healthConditions,
-      nutritionProfile.dietaryRestrictions.foodPreferences,
-      nutritionProfile,
-      effectiveTargets,
-      healthRuleContext
-    );
+    const dietReadyDbDishes = effectiveDiet
+      ? dietFilteredDbDishes
+      : tokenFilteredDbDishes;
+    const profileFilteredDbDishes = recommendationMode
+      ? dietReadyDbDishes
+      : filterDishesByHealthProfile(
+          dietReadyDbDishes,
+          nutritionProfile.healthConditions,
+          nutritionProfile.dietaryRestrictions.foodPreferences,
+          nutritionProfile,
+          effectiveTargets,
+          healthRuleContext
+        );
     // Apply a second, explicit allergen filter. The generic token filter may
     // miss aliases such as mayonnaise, balut, tortang, or *silog for egg.
     const filteredDbDishes = mealPlannerHardFilterDishesByAllergies(
@@ -5714,6 +5710,15 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
       ? `Avoid reusing these meals from the user's three most recent plans unless medically or dietarily necessary: ${recentMealNames.join(', ')}.`
       : 'There are no recent saved meals to avoid.';
 
+    const recommendationModePrompt = recommendationMode
+      ? [
+          'RECOMMENDATION MODE IS ACTIVE.',
+          'Treat health-condition rules as general meal-selection guidance, not as clinical hard-stop criteria.',
+          'Allergies and religious restrictions remain mandatory.',
+          'Prefer the recommended calorie target, balanced macros, lower-sodium foods, vegetables, fiber, and less-fried cooking, but return a usable plan even when every advisory preference cannot be met exactly.',
+        ].join(' ')
+      : 'STRICT HEALTH-SAFEGUARD MODE IS ACTIVE.';
+
     const prompt = `
 Create one personalized seven-day Filipino meal plan.
 
@@ -5737,7 +5742,9 @@ PERSONALIZATION RULES
 3. ${mealPlannerMealTypeRules(mealType)}
 4. ${previousMealsRule}
 5. The selected goal, lifestyle, meal pattern, diet, allergies, health profile, and targets must materially change the chosen dishes and portions. Never return a generic default plan.
-6. Treat allergies, avoid-list items, diet rules, and health-profile restrictions as hard constraints. Check the meal name, every ingredient, sauce, seasoning, garnish, side dish, coating, noodle, dessert, and every cooking step. Never include an allergen under a synonym or prepared-food name.
+6. ${recommendationMode
+  ? 'Treat allergies and religious restrictions as hard constraints. Treat health-condition targets as recommendations that should guide choices without preventing completion of the plan.'
+  : 'Treat allergies, avoid-list items, diet rules, and health-profile restrictions as hard constraints.'} Check the meal name, every ingredient, sauce, seasoning, garnish, side dish, coating, noodle, dessert, and every cooking step. Never include an allergen under a synonym or prepared-food name.
 7. For an egg allergy, exclude eggs and all common egg-containing foods, including itlog, balut, penoy, mayonnaise/mayo, aioli, custard, leche flan, meringue, omelet/omelette, egg noodles, egg wash, tortang dishes, and any *silog meal. Do not confuse eggplant with egg.
 8. Keep each day's calories within ±7% of the calorie target unless the supplied medical profile requires a stricter rule.
 9. Keep the seven-day average protein, carbohydrate, and fat totals within ±10% of the supplied daily macro targets.
@@ -5747,6 +5754,7 @@ PERSONALIZATION RULES
 13. ${dishUsageRule}${dietRules}
 
 HEALTH AND EVIDENCE PROFILE
+${recommendationModePrompt}
 ${buildNutritionProfilePromptBlock(nutritionProfile, effectiveTargets, healthRuleContext)}
 
 ${buildNationalNutritionStandardsBlock(effectiveTargets)}
@@ -5815,7 +5823,9 @@ OUTPUT REQUIREMENTS
               role: 'system',
               content: [
                 'You are a Filipino registered nutritionist creating strongly personalized meal plans.',
-                'All allergy, medical, diet, and avoid-list constraints are mandatory.',
+                recommendationMode
+                  ? 'Allergies and religious restrictions are mandatory. Medical-condition rules are general recommendations and must not prevent completion of the plan.'
+                  : 'All allergy, medical, diet, and avoid-list constraints are mandatory.',
                 'Never include a prohibited allergen in a meal name, ingredient, sauce, garnish, side, seasoning, coating, or cooking instruction, including synonyms and prepared foods.',
                 'Different user inputs must produce materially different dish choices, portions, protein distribution, and meal timing.',
                 'Return valid JSON only.'
@@ -5963,6 +5973,7 @@ OUTPUT REQUIREMENTS
     weekPlan = enforceMealPlannerCkdProteinTargets(weekPlan, nutritionProfile, healthRuleContext);
     weekPlan = ensureWeekPlanServingMetadata(weekPlan);
 
+    let healthRecommendationWarnings: MealPlannerHealthRuleViolation[] = [];
     let healthRuleViolations = mealPlannerFindWeekPlanHealthRuleViolations(weekPlan, healthRuleContext);
     if (healthRuleViolations.length > 0) {
       weekPlan = mealPlannerReplaceHealthUnsafeMeals(
@@ -5976,11 +5987,62 @@ OUTPUT REQUIREMENTS
     }
 
     if (healthRuleViolations.length > 0) {
+      // Give combined profiles such as obesity + CKD one deterministic,
+      // database-driven repair attempt before blocking the response. This does
+      // not weaken any medical rule; the repaired plan is validated again.
+      let repairedPlan = generateWeekPlan(
+        null,
+        effectiveTargets,
+        goal,
+        allRestrictionTokens,
+        filteredDbDishes,
+        effectiveDiet
+      );
+      repairedPlan = addRiceSidesToMeals(repairedPlan);
+      repairedPlan = scaleWeekPlanToCalorieTarget(repairedPlan, effectiveTargets);
+      repairedPlan = enforceMealPlannerCkdProteinTargets(
+        repairedPlan,
+        nutritionProfile,
+        healthRuleContext
+      );
+      repairedPlan = ensureWeekPlanServingMetadata(repairedPlan);
+      repairedPlan = enforceMealPlannerNutritionConsistency(repairedPlan);
+      repairedPlan = recomputeWeekPlanTotals(repairedPlan);
+
+      const repairedViolations = mealPlannerFindWeekPlanHealthRuleViolations(
+        repairedPlan,
+        healthRuleContext
+      );
+      const repairedAllergenViolations = mealPlannerFindWeekPlanAllergenViolations(
+        repairedPlan,
+        allergyTokens
+      );
+
+      if (repairedViolations.length === 0 && repairedAllergenViolations.length === 0) {
+        weekPlan = repairedPlan;
+        healthRuleViolations = [];
+      }
+    }
+
+    if (recommendationMode && healthRuleViolations.length > 0) {
+      // In recommendation mode, health conditions are general guidance rather
+      // than clinical hard stops. Keep the warnings for transparency, but do
+      // not prevent the user from receiving a plan. Allergies and religious
+      // restrictions remain hard requirements and are validated separately.
+      healthRecommendationWarnings = healthRuleViolations;
+      healthRuleViolations = [];
+    }
+
+    if (healthRuleViolations.length > 0) {
       return res.status(422).json({
         success: false,
         message: 'The generated plan could not satisfy all selected medical-condition safeguards and was blocked.',
         healthConditionsApplied: healthConditions,
         healthRuleViolations,
+        requiredClinicalFields: getMealPlannerClinicalRequiredFields(
+          nutritionProfile,
+          healthConditions
+        ),
         saved: false,
       });
     }
@@ -6013,6 +6075,8 @@ OUTPUT REQUIREMENTS
       allergiesApplied: allergyTokens,
       healthConditionsApplied: healthConditions,
       healthRuleSummary: nutritionProfile.healthRuleSummary,
+      recommendationModeApplied: recommendationMode,
+      healthRecommendationWarnings,
     };
 
     // Generation only previews the plan. Saving happens exclusively through
@@ -6021,6 +6085,8 @@ OUTPUT REQUIREMENTS
       success: true,
       mealPlan: responseMealPlan,
       allergiesApplied: allergyTokens,
+      recommendationModeApplied: recommendationMode,
+      healthRecommendationWarnings,
       saved: false
     });
   } catch (err: any) {
@@ -6037,7 +6103,6 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
       ...(savedPreferences || {}),
       ...(req.body || {}),
       demographics: req.body?.demographics ?? savedPreferences?.demographics,
-      ckdProfile: req.body?.ckdProfile ?? savedPreferences?.ckdProfile,
       healthConditions: req.body?.healthConditions ?? req.body?.healthCondition ?? savedPreferences?.healthConditions,
       dietaryRestrictions: req.body?.dietaryRestrictions ?? savedPreferences?.dietaryRestrictions,
       targets: req.body?.targets ?? savedPreferences?.targets,
@@ -6045,17 +6110,36 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
       goal: req.body?.goal ?? savedPreferences?.goal,
       lifestyle: req.body?.lifestyle ?? savedPreferences?.lifestyle,
       allergies: req.body?.allergies ?? savedPreferences?.allergies,
+      recommendationPolicy:
+        req.body?.recommendationPolicy ?? savedPreferences?.recommendationPolicy,
     };
     const { dayIndex, day, mealType, mealKey, mealTypeKey, mealPlan, planId, excludeMealNames = [], currentMeal, allergies, dietaryRestrictions, targets, goal, lifestyle, diet } = mergedBody as any;
+    const recommendationPolicy = mergedBody?.recommendationPolicy || {};
+    const recommendationMode = mealPlannerUsesRecommendationMode(mergedBody);
     const healthConditions = normalizeHealthConditions(mergedBody.healthConditions);
     const normalizedDietaryRestrictions = normalizeDietaryRestrictions(dietaryRestrictions);
     const inferredDiet = inferDietFromRestrictions(normalizedDietaryRestrictions);
 
     const allergyTokens = normalizeSelectionList(allergies);
     const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
-    const profileRestrictionTokens = getRestrictionTokensFromProfile(normalizedDietaryRestrictions, healthConditions);
-    const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens, ...profileRestrictionTokens]));
-    const normalizedDiet = normalizeDietType(diet || inferredDiet);
+    const rawProfileRestrictionTokens = getRestrictionTokensFromProfile(
+      normalizedDietaryRestrictions,
+      healthConditions
+    );
+    const profileRestrictionTokens = recommendationMode
+      ? mealPlannerRemoveAdvisoryRestrictionTokens(rawProfileRestrictionTokens)
+      : rawProfileRestrictionTokens;
+    const allRestrictionTokens = Array.from(
+      new Set([...allergyTokens, ...deprecatedRestrictionTokens, ...profileRestrictionTokens])
+    );
+    const requestedDiet = normalizeDietType(diet || inferredDiet);
+    const mustPreserveVegetarianRestriction =
+      normalizedDietaryRestrictions.religious === 'vegetarian';
+    const normalizedDiet = recommendationMode
+      && recommendationPolicy?.clearOptionalDietRestrictions
+      && !mustPreserveVegetarianRestriction
+      ? ''
+      : requestedDiet;
     const nutritionProfile = normalizeMealPlannerProfile(
       { ...mergedBody, healthConditions, dietaryRestrictions: normalizedDietaryRestrictions },
       normalizedDiet,
@@ -6065,11 +6149,13 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     if (healthRuleContext.validationErrors.length > 0) {
       return res.status(422).json({
         success: false,
-        message: 'More clinical information is required before a safe meal can be regenerated.',
+        message: 'The submitted profile could not be used to regenerate the requested meal.',
         errors: healthRuleContext.validationErrors,
-        requiredFields: healthConditions.includes('chronic_kidney_disease')
-          ? ['demographics.weightKg', 'ckdProfile.stage', 'ckdProfile.treatment', 'ckdProfile.metabolicallyStable']
-          : [],
+        requiredFields: getMealPlannerClinicalRequiredFields(
+          nutritionProfile,
+          healthConditions
+        ),
+        healthConditionsApplied: healthConditions,
       });
     }
     const effectiveTargets = healthRuleContext.effectiveTargets;
@@ -6187,16 +6273,31 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
       );
 
       const allergenHits = mealPlannerFindAllergenHits(finalMeal, allergyTokens);
-      const healthReasons = mealPlannerMealHealthViolationReasons(finalMeal, String(category || 'meal'), healthRuleContext);
-      if (allergenHits.length > 0 || healthReasons.length > 0) {
+      const healthReasons = mealPlannerMealHealthViolationReasons(
+        finalMeal,
+        String(category || 'meal'),
+        healthRuleContext
+      );
+      if (allergenHits.length > 0) {
         return res.status(422).json({
           success: false,
-          message: 'The regenerated meal violated an allergy or medical-condition safeguard and was blocked.',
+          message: 'The regenerated meal contained a selected allergen and was blocked.',
+          allergenHits,
+          healthRuleViolations: healthReasons,
+        });
+      }
+      if (healthReasons.length > 0 && !recommendationMode) {
+        return res.status(422).json({
+          success: false,
+          message: 'The regenerated meal violated a medical-condition safeguard and was blocked.',
           allergenHits,
           healthRuleViolations: healthReasons,
         });
       }
 
+      const healthRecommendationWarnings = recommendationMode
+        ? healthReasons
+        : [];
       finalMeal = mealPlannerNormalizeNutrition(finalMeal);
 
       return res.json({
@@ -6210,6 +6311,8 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
           effectiveDiet,
           cautions: healthRuleContext.cautions,
         },
+        recommendationModeApplied: recommendationMode,
+        healthRecommendationWarnings,
       });
     };
 
@@ -6264,14 +6367,17 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     // Apply best-effort filtering for fallback picks
     const candidateByTokens = filterDishesByTokens(dishes, allRestrictionTokens);
     const candidateByDiet = filterDishesByDiet(candidateByTokens, effectiveDiet);
-    const candidateDishes = filterDishesByHealthProfile(
-      effectiveDiet ? candidateByDiet : candidateByTokens,
-      nutritionProfile.healthConditions,
-      nutritionProfile.dietaryRestrictions.foodPreferences,
-      nutritionProfile,
-      effectiveTargets,
-      healthRuleContext
-    );
+    const candidateDietReady = effectiveDiet ? candidateByDiet : candidateByTokens;
+    const candidateDishes = recommendationMode
+      ? candidateDietReady
+      : filterDishesByHealthProfile(
+          candidateDietReady,
+          nutritionProfile.healthConditions,
+          nutritionProfile.dietaryRestrictions.foodPreferences,
+          nutritionProfile,
+          effectiveTargets,
+          healthRuleContext
+        );
     const allowAiFillInMeal = (healthConditions.length > 0 || !!effectiveDiet) && candidateDishes.length < 2;
 
     // Helper: pick random excluding excludeArr
@@ -6300,6 +6406,9 @@ Aim for around ${desiredMealCalories} kcal for THIS regenerated ${isSnack ? 'sna
   Diet type: ${humanizeDietType(effectiveDiet)}.
   Diet rule: ${dietRuleText || 'No strict diet rule.'}
   Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}.
+${recommendationMode
+  ? 'RECOMMENDATION MODE: health-condition rules are advisory and should not block a usable meal; allergies and religious restrictions remain mandatory.'
+  : 'STRICT MODE: all selected medical-condition safeguards are mandatory.'}
 ${buildNutritionProfilePromptBlock(nutritionProfile, effectiveTargets, healthRuleContext)}
 ${listRule}
 ${buildNationalNutritionStandardsBlock(effectiveTargets)}
@@ -6316,7 +6425,14 @@ Instruction rules: 4-7 numbered steps with actionable details and approximate ti
         const completion: any = await safeOpenAICompletionsCreate({
           model: OPENAI_MODEL,
           messages: [
-            { role: 'system', content: allowAiFillInMeal ? 'You are a Filipino nutritionist. Prefer provided list; if insufficient, add one compliant meal.' : 'You are a Filipino nutritionist. Use only provided list.' },
+            {
+              role: 'system',
+              content: recommendationMode
+                ? 'You are a Filipino nutritionist. Allergies and religious restrictions are mandatory. Health-condition rules are advisory recommendations; return a usable meal.'
+                : allowAiFillInMeal
+                  ? 'You are a Filipino nutritionist. Prefer provided list; if insufficient, add one compliant meal.'
+                  : 'You are a Filipino nutritionist. Use only provided list.',
+            },
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
