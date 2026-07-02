@@ -168,6 +168,40 @@ const getMealTypeFromDiet = (dietValue: string): string => {
   return "balanced";
 };
 
+const normalizeHealthConditionValue = (raw: unknown): string => {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!value || value === "none") return "";
+
+  const canonical = value
+    .replace(/[\s/()-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  const aliases: Record<string, string> = {
+    hypertension: "hypertension",
+    high_blood_pressure: "hypertension",
+
+    diabetes: "diabetes",
+    diabetes_mellitus: "diabetes",
+
+    obesity: "obesity_overweight",
+    overweight: "obesity_overweight",
+    obesity_overweight: "obesity_overweight",
+
+    dyslipidemia: "dyslipidemia_cardiovascular",
+    cardiovascular: "dyslipidemia_cardiovascular",
+    cardiovascular_disease: "dyslipidemia_cardiovascular",
+    dyslipidemia_cardiovascular: "dyslipidemia_cardiovascular",
+
+    ckd: "chronic_kidney_disease",
+    chronic_kidney_disease: "chronic_kidney_disease",
+  };
+
+  return aliases[value] || aliases[canonical] || canonical;
+};
 
 const parseDelimitedSelection = (input: any): string[] => {
   if (!input) return [];
@@ -316,6 +350,8 @@ interface Meal {
   carbs: number;
   fats: number;
   recipe: string;
+  servingSizeGrams?: number;
+  portionGrams?: number;
   // AI or server-provided instructions text (optional)
   instructions?: string;
   suitabilityNotes?: string[];
@@ -727,7 +763,6 @@ const MealPlanner: React.FC = () => {
         if (Number.isFinite(prefCalories) && prefCalories > 0) {
           setCalorieTarget(prefCalories);
         }
-
       }
     } catch (error) {
       console.error("Error loading preferences:", error);
@@ -920,10 +955,86 @@ const MealPlanner: React.FC = () => {
         return;
       }
 
+      const rawMealPlan = json.mealPlan;
+      const mealPlanBase = Array.isArray(rawMealPlan)
+        ? { weekPlan: rawMealPlan }
+        : rawMealPlan;
+
+      // Merge health-aware fields whether the backend returns them inside
+      // mealPlan or at the top level of the response.
+      const mealPlanWithHealthData = {
+        ...mealPlanBase,
+
+        healthConditionTips:
+          mealPlanBase?.healthConditionTips ??
+          mealPlanBase?.health_condition_tips ??
+          json.healthConditionTips ??
+          json.health_condition_tips ??
+          json.data?.healthConditionTips ??
+          json.data?.health_condition_tips ??
+          [],
+
+        nutritionTips:
+          mealPlanBase?.nutritionTips ??
+          mealPlanBase?.nutrition_tips ??
+          json.nutritionTips ??
+          json.nutrition_tips ??
+          json.data?.nutritionTips ??
+          json.data?.nutrition_tips ??
+          [],
+
+        evidenceSummary:
+          mealPlanBase?.evidenceSummary ??
+          mealPlanBase?.evidence_summary ??
+          json.evidenceSummary ??
+          json.evidence_summary ??
+          json.data?.evidenceSummary ??
+          json.data?.evidence_summary ??
+          [],
+
+        citations:
+          mealPlanBase?.citations ??
+          mealPlanBase?.sources ??
+          json.citations ??
+          json.sources ??
+          json.data?.citations ??
+          json.data?.sources ??
+          [],
+
+        profileSummary:
+          mealPlanBase?.profileSummary ??
+          mealPlanBase?.profile_summary ??
+          json.profileSummary ??
+          json.profile_summary ??
+          json.data?.profileSummary ??
+          json.data?.profile_summary ?? {
+            healthConditions: body.healthConditions,
+            demographics: body.demographics,
+            diet: body.diet,
+            allergies: body.allergies,
+            targets: body.targets,
+            dietaryRestrictions: body.dietaryRestrictions,
+            socioeconomic: body.socioeconomic,
+            lifestyleFactors: body.lifestyleFactors,
+          },
+      };
+
+      console.log("Selected health conditions:", body.healthConditions);
+      console.log(
+        "Backend health-condition tips:",
+        mealPlanWithHealthData.healthConditionTips,
+      );
+
       const normalized = ensurePlanNormalized(
-        json.mealPlan,
+        mealPlanWithHealthData,
         body.targets.calories,
       );
+
+      console.log(
+        "Normalized health-condition tips:",
+        normalized?.healthConditionTips,
+      );
+
       setMealPlan(normalized);
       setCurrentPlanId(json?.planId ?? null);
       setShowPreferencesForm(false);
@@ -1099,9 +1210,7 @@ const MealPlanner: React.FC = () => {
           setCalorieTarget(Math.round(recommendedCalories));
         }
 
-        const transferredAge = Number(
-          params.get("age") ?? stored?.age ?? 0,
-        );
+        const transferredAge = Number(params.get("age") ?? stored?.age ?? 0);
         if (
           Number.isFinite(transferredAge) &&
           transferredAge >= 10 &&
@@ -1241,8 +1350,7 @@ const MealPlanner: React.FC = () => {
       const body = {
         planId: currentPlanId || undefined,
         planName:
-          planName ||
-          `${normalizeDietValue(diet) || "balanced"} Meal Plan`,
+          planName || `${normalizeDietValue(diet) || "balanced"} Meal Plan`,
         mealPlan,
       };
 
@@ -1381,7 +1489,18 @@ const MealPlanner: React.FC = () => {
     return [];
   };
 
-  const normalizePortionSize = (_portion: any): string => {
+  const normalizePortionSize = (
+    portion: any,
+    servingSizeGrams?: any,
+  ): string => {
+    const supplied = String(portion ?? "").trim();
+    if (supplied) return supplied;
+
+    const grams = Number(servingSizeGrams);
+    if (Number.isFinite(grams) && grams > 0) {
+      return `1 serving (${Math.round(grams)} g prepared portion)`;
+    }
+
     return "1 serving";
   };
 
@@ -1396,9 +1515,7 @@ const MealPlanner: React.FC = () => {
     if (!normalizedId) return null;
 
     return (
-      mealPlan?.citations?.find(
-        (citation) => citation.id === normalizedId,
-      ) ||
+      mealPlan?.citations?.find((citation) => citation.id === normalizedId) ||
       KNOWN_NUTRITION_CITATIONS[normalizedId] ||
       null
     );
@@ -1473,7 +1590,10 @@ const MealPlanner: React.FC = () => {
             )}
           <p className="daily-meal-portion">
             <strong>Portion:</strong>{" "}
-            {normalizePortionSize(mealObj.portionSize)}
+            {normalizePortionSize(
+              mealObj.portionSize ?? mealObj.portion,
+              mealObj.servingSizeGrams ?? mealObj.portionGrams,
+            )}
           </p>
           {Array.isArray(mealObj.suitabilityNotes) &&
             mealObj.suitabilityNotes.length > 0 && (
@@ -1618,17 +1738,23 @@ const MealPlanner: React.FC = () => {
   // only a fallback because rounded macro grams do not always equal the exact
   // calorie allocation for a meal.
   function calculateMealCalories449(meal: any): number {
-    const explicitCalories = Number(meal?.calories);
-    if (Number.isFinite(explicitCalories) && explicitCalories >= 0) {
-      return Math.round(explicitCalories);
+    const hasMacroData = [meal?.protein, meal?.carbs, meal?.fats].some(
+      hasProvidedNumber,
+    );
+
+    if (hasMacroData) {
+      return calculateCaloriesFromMacros(
+        meal?.protein,
+        meal?.carbs,
+        meal?.fats,
+        0,
+      );
     }
 
-    return calculateCaloriesFromMacros(
-      meal?.protein,
-      meal?.carbs,
-      meal?.fats,
-      0,
-    );
+    const explicitCalories = Number(meal?.calories);
+    return Number.isFinite(explicitCalories) && explicitCalories >= 0
+      ? Math.round(explicitCalories)
+      : 0;
   }
 
   // Normalize single meal values (ensures numeric macros, default portion size, converts string ingredients)
@@ -1668,11 +1794,32 @@ const MealPlanner: React.FC = () => {
       name: String(m.name || m.title || "Unknown dish"),
       ingredients: normalizeIngredientsToArray(m.ingredients || m.ings || []),
       portionSize: normalizePortionSize(
-        m.portionSize || m.servings || "1 serving",
+        m.portionSize ?? m.portion ?? m.servings,
+        m.servingSizeGrams ??
+          m.serving_size_grams ??
+          m.serving_size_g ??
+          m.portionGrams ??
+          m.portion_grams,
       ),
-      calories:
-        explicitCalories ??
-        calculateCaloriesFromMacros(proteinRaw, carbsRaw, fatsRaw, 0),
+      servingSizeGrams: Number(
+        m.servingSizeGrams ??
+          m.serving_size_grams ??
+          m.serving_size_g ??
+          m.portionGrams ??
+          m.portion_grams ??
+          0,
+      ) || undefined,
+      portionGrams: Number(
+        m.portionGrams ??
+          m.portion_grams ??
+          m.servingSizeGrams ??
+          m.serving_size_grams ??
+          m.serving_size_g ??
+          0,
+      ) || undefined,
+      calories: [proteinRaw, carbsRaw, fatsRaw].some(hasProvidedNumber)
+        ? calculateCaloriesFromMacros(proteinRaw, carbsRaw, fatsRaw, 0)
+        : (explicitCalories ?? 0),
       protein,
       carbs,
       fats,
@@ -1715,6 +1862,62 @@ const MealPlanner: React.FC = () => {
       totalFats: Number(totals.fats.toFixed(2)),
     };
   }
+
+  const repeatedMealConsistencyKey = (meal: Meal): string => {
+    const normalizedName = String(meal?.name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s*\(alt\)\s*$/i, "")
+      .replace(/\s+/g, " ");
+    const servingGrams = Math.max(
+      0,
+      Math.round(Number(meal?.servingSizeGrams ?? meal?.portionGrams ?? 0)),
+    );
+    const portion = String(meal?.portionSize || "1 serving")
+      .trim()
+      .toLowerCase();
+    return `${normalizedName}|${servingGrams || portion}`;
+  };
+
+  const enforceRepeatedMealNutritionConsistency = (
+    days: DayPlan[],
+  ): DayPlan[] => {
+    const canonical = new Map<
+      string,
+      Pick<Meal, "calories" | "protein" | "carbs" | "fats">
+    >();
+
+    return days.map((day) => {
+      const meals = Object.entries(day.meals).reduce(
+        (acc, [slot, rawMeal]) => {
+          const meal = normalizeMeal(rawMeal);
+          const key = repeatedMealConsistencyKey(meal);
+          const saved = canonical.get(key);
+
+          if (saved) {
+            acc[slot as keyof DayMeals] = {
+              ...meal,
+              ...saved,
+            };
+          } else {
+            const values = {
+              calories: calculateMealCalories449(meal),
+              protein: Number(meal.protein || 0),
+              carbs: Number(meal.carbs || 0),
+              fats: Number(meal.fats || 0),
+            };
+            canonical.set(key, values);
+            acc[slot as keyof DayMeals] = { ...meal, ...values };
+          }
+
+          return acc;
+        },
+        {} as DayMeals,
+      );
+
+      return recomputeDayTotals({ ...day, meals });
+    });
+  };
 
   // Scale meal allocations proportionally, then use the largest-remainder
   // method so the five meal calories add up to the exact daily target.
@@ -1840,8 +2043,14 @@ const MealPlanner: React.FC = () => {
         totalFats: 0,
       } as DayPlan;
 
-      return rebalanceDayToCalorieTarget(updatedDay, normalizedTargetCalories);
+      // The backend is authoritative for portions and nutrition values.
+      // Do not rescale macros in the UI because that would change nutrition
+      // without changing the listed dish, ingredients, or prepared portion.
+      return recomputeDayTotals(updatedDay);
     });
+
+    const consistentWeek =
+      enforceRepeatedMealNutritionConsistency(normalizedWeek);
 
     // Normalize shopping list if necessary (backend variants supported)
     const rawShoppingList =
@@ -1875,7 +2084,10 @@ const MealPlanner: React.FC = () => {
 
     const normalizeTipStringList = (value: any): string[] => {
       if (Array.isArray(value)) {
-        return value.map(String).map((item) => item.trim()).filter(Boolean);
+        return value
+          .map(String)
+          .map((item) => item.trim())
+          .filter(Boolean);
       }
       if (typeof value === "string") {
         return value
@@ -1888,27 +2100,36 @@ const MealPlanner: React.FC = () => {
 
     const rawHealthConditionTips =
       plan.healthConditionTips ?? plan.health_condition_tips ?? [];
-    let healthConditionTips: HealthConditionTip[] = Array.isArray(
-      rawHealthConditionTips,
-    )
+
+    const healthConditionTipItems = Array.isArray(rawHealthConditionTips)
       ? rawHealthConditionTips
+      : rawHealthConditionTips &&
+          typeof rawHealthConditionTips === "object"
+        ? Object.values(rawHealthConditionTips)
+        : [];
+
+    let healthConditionTips: HealthConditionTip[] =
+      healthConditionTipItems.length > 0
+        ? healthConditionTipItems
           .map((tip: any) => {
-            const condition = String(
-              tip?.condition ?? tip?.value ?? tip?.id ?? "",
-            )
-              .trim()
-              .toLowerCase()
-              .replace(/[\s-]+/g, "_");
+            const condition = normalizeHealthConditionValue(
+              tip?.condition ??
+                tip?.value ??
+                tip?.id ??
+                tip?.label ??
+                "",
+            );
             const fallback = HEALTH_TIP_FALLBACKS[condition];
 
             return {
               condition,
               label: String(
-                tip?.label || fallback?.label || condition || "Health condition",
+                tip?.label ||
+                  fallback?.label ||
+                  condition ||
+                  "Health condition",
               ).trim(),
-              summary: String(
-                tip?.summary || fallback?.summary || "",
-              ).trim(),
+              summary: String(tip?.summary || fallback?.summary || "").trim(),
               whyMealPlanChanged: normalizeTipStringList(
                 tip?.whyMealPlanChanged ??
                   tip?.why_meal_plan_changed ??
@@ -1937,17 +2158,14 @@ const MealPlanner: React.FC = () => {
                   "",
               ).trim(),
               citationIds: normalizeTipStringList(
-                tip?.citationIds ??
-                  tip?.citation_ids ??
-                  fallback?.citationIds,
+                tip?.citationIds ?? tip?.citation_ids ?? fallback?.citationIds,
               ),
             } as HealthConditionTip;
           })
-          .filter(
-            (tip: HealthConditionTip) =>
-              Boolean(tip.condition || tip.label || tip.summary),
+          .filter((tip: HealthConditionTip) =>
+            Boolean(tip.condition || tip.label || tip.summary),
           )
-      : [];
+        : [];
 
     // Older saved plans may not contain the new structured field. Rebuild
     // condition tips from the saved profile when possible.
@@ -1957,14 +2175,9 @@ const MealPlanner: React.FC = () => {
           plan.profile_summary?.healthConditions ??
           plan.profileSummary?.health_conditions ??
           plan.profile_summary?.health_conditions ??
-          [],
+          healthConditions,
       )
-        .map((condition) =>
-          String(condition)
-            .trim()
-            .toLowerCase()
-            .replace(/[\s-]+/g, "_"),
-        )
+        .map(normalizeHealthConditionValue)
         .filter(Boolean);
 
       healthConditionTips = savedConditions
@@ -2020,7 +2233,7 @@ const MealPlanner: React.FC = () => {
     healthConditionTips.forEach((tip) =>
       tip.citationIds.forEach((id) => referencedCitationIds.add(id)),
     );
-    normalizedWeek.forEach((day) =>
+    consistentWeek.forEach((day) =>
       Object.values(day.meals || {}).forEach((meal: any) =>
         (Array.isArray(meal?.citationIds) ? meal.citationIds : []).forEach(
           (id: string) => referencedCitationIds.add(String(id)),
@@ -2042,14 +2255,41 @@ const MealPlanner: React.FC = () => {
       ...plan,
       targetCalories: normalizedTargetCalories,
       calorieTolerance: 0,
-      weekPlan: normalizedWeek,
+      weekPlan: consistentWeek,
       shoppingList,
       mealPrepTips,
       nutritionTips,
       healthConditionTips,
       evidenceSummary,
       citations,
-      profileSummary: plan.profileSummary ?? plan.profile_summary ?? null,
+      profileSummary:
+        plan.profileSummary ??
+        plan.profile_summary ?? {
+          healthConditions: [...healthConditions],
+          demographics: {
+            age,
+            sex,
+            heightCm,
+            weightKg,
+          },
+          diet,
+          allergies: [...allergies],
+          targets: getCalorieAlignedTargets(),
+          dietaryRestrictions: {
+            cultural: culturalContext,
+            religious: religiousRestriction,
+            foodPreferences: [...foodPreferences],
+          },
+          socioeconomic: {
+            status: socioeconomicStatus,
+            dailyBudgetPhp,
+          },
+          lifestyleFactors: {
+            physicalActivity: lifestyle,
+            smokingStatus,
+            alcoholIntake,
+          },
+        },
     } as MealPlan;
   }
 
@@ -2244,8 +2484,7 @@ const MealPlanner: React.FC = () => {
               {
                 ...mealPlan,
                 weekPlan: json.weekPlan,
-                shoppingList:
-                  json.shoppingList ?? mealPlan.shoppingList ?? [],
+                shoppingList: json.shoppingList ?? mealPlan.shoppingList ?? [],
                 nutritionTips:
                   json.nutritionTips ??
                   json.nutrition_tips ??
@@ -2258,8 +2497,7 @@ const MealPlanner: React.FC = () => {
                   json.evidenceSummary ??
                   json.evidence_summary ??
                   mealPlan.evidenceSummary,
-                citations:
-                  json.citations ?? json.sources ?? mealPlan.citations,
+                citations: json.citations ?? json.sources ?? mealPlan.citations,
                 profileSummary:
                   json.profileSummary ??
                   json.profile_summary ??
@@ -2282,10 +2520,7 @@ const MealPlanner: React.FC = () => {
                   ...d.meals,
                   [mealKey]: normalizedNewMeal,
                 };
-                return rebalanceDayToCalorieTarget(
-                  { ...d, meals: updatedMeals },
-                  prev.targetCalories ?? calorieTarget,
-                );
+                return recomputeDayTotals({ ...d, meals: updatedMeals });
               });
               if (nextShoppingList) next.shoppingList = nextShoppingList;
 
@@ -2843,8 +3078,12 @@ const MealPlanner: React.FC = () => {
             <div className="mp-toolbar-title-wrap">
               <IonIcon icon={restaurant} className="mp-toolbar-title-icon" />
               <div className="mp-toolbar-title-copy">
-                <span className="mp-toolbar-title-main">Filipino Meal Planner</span>
-                <span className="mp-toolbar-title-sub">Personalized nutrition planning</span>
+                <span className="mp-toolbar-title-main">
+                  Filipino Meal Planner
+                </span>
+                <span className="mp-toolbar-title-sub">
+                  Personalized nutrition planning
+                </span>
               </div>
             </div>
           </IonTitle>
@@ -2988,32 +3227,46 @@ const MealPlanner: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <h3>Health Conditions</h3>
-                  <IonItem className="custom-item" >
+                  <h3>Health Condition</h3>
+
+                  <IonItem className="custom-item">
                     <IonLabel position="stacked">
-                      <IonIcon icon={warning} /> Conditions
+                      <IonIcon icon={warning} /> Condition
                     </IonLabel>
+
                     <IonSelect
-                      multiple
-                      value={healthConditions}
-                      placeholder="Select health conditions"
-                      onIonChange={(e) =>
-                        setHealthConditions((e.detail.value as string[]) || [])
-                      }
+                      value={healthConditions[0] || ""}
+                      placeholder="Select a health condition"
+                      onIonChange={(e) => {
+                        const selectedCondition = e.detail.value as string;
+
+                        setHealthConditions(
+                          selectedCondition ? [selectedCondition] : [],
+                        );
+                      }}
                     >
-                      {HEALTH_CONDITIONS.map((opt) => (
-                        <IonSelectOption key={opt.value} value={opt.value}>
-                          {opt.label}
+                      <IonSelectOption value="">None</IonSelectOption>
+
+                      {HEALTH_CONDITIONS.map((option) => (
+                        <IonSelectOption
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
                         </IonSelectOption>
                       ))}
                     </IonSelect>
                   </IonItem>
+
                   {healthConditions.length > 0 && (
                     <div className="restriction-chip">
                       <IonIcon icon={checkmarkCircle} />
+
                       <IonLabel>
-                        {healthConditions.length} condition filter
-                        {healthConditions.length === 1 ? "" : "s"} applied
+                        {HEALTH_CONDITIONS.find(
+                          (option) => option.value === healthConditions[0],
+                        )?.label || "Health condition"}{" "}
+                        applied
                       </IonLabel>
                     </div>
                   )}
@@ -3430,7 +3683,9 @@ const MealPlanner: React.FC = () => {
                   </div>
                   <div className="summary-item">
                     <div className="summary-label">Fats</div>
-                    <div className="summary-value">{todayPlanTotals.fats.toFixed(2)}g</div>
+                    <div className="summary-value">
+                      {todayPlanTotals.fats.toFixed(2)}g
+                    </div>
                   </div>
                 </div>
 
@@ -4144,7 +4399,11 @@ const MealPlanner: React.FC = () => {
                 <div className="recipe-section">
                   <h4 className="section-heading">📍 Portion Size</h4>
                   <p className="recipe-text">
-                    {normalizePortionSize(selectedMeal.meal.portionSize)}
+                    {normalizePortionSize(
+                      selectedMeal.meal.portionSize ?? selectedMeal.meal.portion,
+                      selectedMeal.meal.servingSizeGrams ??
+                        selectedMeal.meal.portionGrams,
+                    )}
                   </p>
                 </div>
 
@@ -4313,7 +4572,9 @@ const MealPlanner: React.FC = () => {
               <div className="mp-history-empty">
                 <IonIcon icon={documents} />
                 <h3>No saved meal plans yet</h3>
-                <p>Generate a plan and select Save to add it to your history.</p>
+                <p>
+                  Generate a plan and select Save to add it to your history.
+                </p>
                 <IonButton
                   fill="outline"
                   onClick={() => setShowSavedPlans(false)}

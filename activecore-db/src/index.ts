@@ -1934,16 +1934,22 @@ async function ensureAbsenceReminderSettingsTable() {
 // ===== HELPER FUNCTIONS =====
 
 function calculateCaloriesFromMacros(protein: any, carbs: any, fats: any, fallbackCalories = 0): number {
-  const p = Number(protein ?? 0);
-  const c = Number(carbs ?? 0);
-  const f = Number(fats ?? 0);
-  const hasMacroData = Number.isFinite(p) || Number.isFinite(c) || Number.isFinite(f);
-  if (!hasMacroData) return Number(fallbackCalories || 0);
+  const hasProvidedNumber = (value: any): boolean =>
+    value !== undefined
+    && value !== null
+    && value !== ''
+    && Number.isFinite(Number(value));
 
-  const proteinSafe = Number.isFinite(p) ? Math.max(0, p) : 0;
-  const carbsSafe = Number.isFinite(c) ? Math.max(0, c) : 0;
-  const fatsSafe = Number.isFinite(f) ? Math.max(0, f) : 0;
-  return Math.round(proteinSafe * 4 + carbsSafe * 4 + fatsSafe * 9);
+  const hasMacroData = [protein, carbs, fats].some(hasProvidedNumber);
+  if (!hasMacroData) {
+    const fallback = Number(fallbackCalories);
+    return Number.isFinite(fallback) ? Math.max(0, Math.round(fallback)) : 0;
+  }
+
+  const proteinSafe = hasProvidedNumber(protein) ? Math.max(0, Number(protein)) : 0;
+  const carbsSafe = hasProvidedNumber(carbs) ? Math.max(0, Number(carbs)) : 0;
+  const fatsSafe = hasProvidedNumber(fats) ? Math.max(0, Number(fats)) : 0;
+  return Math.max(0, Math.round(proteinSafe * 4 + carbsSafe * 4 + fatsSafe * 9));
 }
 
 function caloriesFromMacrosWithFallback(meal: any): number {
@@ -2021,7 +2027,9 @@ function scaleMealPortion(meal: any, factor: number) {
   const scaled: any = { ...meal };
   const scaleField = (key: string) => {
     const value = Number(scaled[key] ?? 0);
-    if (Number.isFinite(value)) scaled[key] = Math.round(value * f);
+    if (Number.isFinite(value)) {
+      scaled[key] = Number((Math.max(0, value) * f).toFixed(2));
+    }
   };
 
   scaleField('protein');
@@ -2326,6 +2334,117 @@ function ensureWeekPlanServingMetadata(weekPlan: any[]): any[] {
     }, {});
     return { ...day, meals: nextMeals };
   });
+}
+
+/**
+ * A meal with the same dish name and the same prepared serving weight must
+ * always expose the same nutrition values. This prevents AI output, daily
+ * calorie scaling, recipe enrichment, or saved-plan reloads from showing an
+ * identical dish/portion with conflicting calories and macros.
+ */
+function mealPlannerConsistencyName(value: any): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\(alt\)\s*$/i, '')
+    .replace(/\s+/g, ' ');
+}
+
+function mealPlannerRoundMacro(value: any): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(Math.max(0, n).toFixed(2)) : 0;
+}
+
+function mealPlannerNormalizeNutrition(meal: any): any {
+  const withServing = ensureMealServingMetadata(meal && typeof meal === 'object'
+    ? meal
+    : { name: String(meal || 'Unnamed Meal') });
+
+  const protein = mealPlannerRoundMacro(withServing.protein ?? withServing.pro);
+  const carbs = mealPlannerRoundMacro(withServing.carbs ?? withServing.carb);
+  const fats = mealPlannerRoundMacro(withServing.fats ?? withServing.fat);
+  const fiber = mealPlannerRoundMacro(withServing.fiber);
+  const calories = calculateCaloriesFromMacros(
+    protein,
+    carbs,
+    fats,
+    Number(withServing.calories ?? withServing.cal ?? 0)
+  );
+
+  return {
+    ...withServing,
+    protein,
+    carbs,
+    fats,
+    fiber,
+    calories,
+    nutrientBasis: 'Calories are derived from the listed protein, carbohydrate, and fat values for this measured serving.',
+  };
+}
+
+function mealPlannerSameDishPortionKey(meal: any): string {
+  const normalized = mealPlannerNormalizeNutrition(meal);
+  const servingSizeGrams = Math.max(
+    1,
+    Math.round(Number(normalized.servingSizeGrams ?? normalized.portionGrams ?? 1))
+  );
+  return `${mealPlannerConsistencyName(normalized.name)}|${servingSizeGrams}g`;
+}
+
+function enforceMealPlannerNutritionConsistency(weekPlan: any[]): any[] {
+  const canonicalByDishAndPortion = new Map<string, any>();
+
+  const consistentDays = (Array.isArray(weekPlan) ? weekPlan : []).map((day: any) => {
+    const rawMeals = day?.meals && typeof day.meals === 'object' ? day.meals : {};
+    const meals = Object.entries(rawMeals).reduce((acc: Record<string, any>, [slot, rawMeal]) => {
+      const normalized = mealPlannerNormalizeNutrition(rawMeal);
+      const key = mealPlannerSameDishPortionKey(normalized);
+      const canonical = canonicalByDishAndPortion.get(key);
+
+      if (!canonical) {
+        canonicalByDishAndPortion.set(key, {
+          calories: normalized.calories,
+          protein: normalized.protein,
+          carbs: normalized.carbs,
+          fats: normalized.fats,
+          fiber: normalized.fiber,
+          servingSizeGrams: normalized.servingSizeGrams,
+          portionGrams: normalized.portionGrams,
+          portionSize: normalized.portionSize,
+          portion: normalized.portion,
+        });
+        acc[slot] = normalized;
+        return acc;
+      }
+
+      acc[slot] = {
+        ...normalized,
+        calories: canonical.calories,
+        protein: canonical.protein,
+        carbs: canonical.carbs,
+        fats: canonical.fats,
+        fiber: canonical.fiber,
+        servingSizeGrams: canonical.servingSizeGrams,
+        portionGrams: canonical.portionGrams,
+        portionSize: canonical.portionSize,
+        portion: canonical.portion,
+        nutritionConsistencyApplied: true,
+      };
+      return acc;
+    }, {});
+
+    const totals = sumMacros(Object.values(meals));
+    return {
+      ...day,
+      meals,
+      totalCalories: totals.calories,
+      totalProtein: Number(totals.protein.toFixed(2)),
+      totalCarbs: Number(totals.carbs.toFixed(2)),
+      totalFats: Number(totals.fats.toFixed(2)),
+    };
+  });
+
+  return consistentDays;
 }
 
 function mealPlannerAddMeasuredEnergyForCalories(meal: any, calorieGap: number, profile?: any): any {
@@ -5479,6 +5598,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
           saved: false,
         });
       }
+      weekPlan = enforceMealPlannerNutritionConsistency(weekPlan);
       weekPlan = recomputeWeekPlanTotals(weekPlan);
       weekPlan = annotateWeekPlanWithEvidence(weekPlan, nutritionProfile, citationIds);
       return res.status(503).json({
@@ -5865,7 +5985,9 @@ OUTPUT REQUIREMENTS
       });
     }
 
-    // Final consistency pass: make sure day totals always equal summed meal macros.
+    // Final consistency pass: identical dishes with identical measured portions
+    // receive identical nutrition values, then day totals are rebuilt.
+    weekPlan = enforceMealPlannerNutritionConsistency(weekPlan);
     weekPlan = recomputeWeekPlanTotals(weekPlan);
     weekPlan = annotateWeekPlanWithEvidence(weekPlan, nutritionProfile, citationIds);
 
@@ -6074,6 +6196,8 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
           healthRuleViolations: healthReasons,
         });
       }
+
+      finalMeal = mealPlannerNormalizeNutrition(finalMeal);
 
       return res.json({
         success: true,
@@ -6309,7 +6433,9 @@ app.post('/api/meal-planner/save', authenticateToken, async (req: AuthRequest, r
       return res.status(400).json({ success: false, message: 'Invalid mealPlan payload' });
     }
 
-    const normalizedWeekPlan = recomputeWeekPlanTotals(incomingWeekPlan);
+    const normalizedWeekPlan = recomputeWeekPlanTotals(
+      enforceMealPlannerNutritionConsistency(incomingWeekPlan)
+    );
 
     // Always rebuild shopping lists from the exact week plan being saved.
     // This prevents an empty/stale client-side list from overwriting the generated list.
