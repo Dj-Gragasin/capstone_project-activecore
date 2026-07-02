@@ -7106,15 +7106,14 @@ app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, 
 app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { date, measurements, strengthStats, proteinIntake, notes } = req.body || {};
+    const { date, strengthStats, proteinIntake, notes } = req.body || {};
 
-    if (!date || !measurements || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
+    if (!date || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
     const recordDate = String(date).slice(0, 10);
     const payload = {
-      measurements,
       strengthStats,
       proteinIntake: Number(proteinIntake),
       notes: typeof notes === 'string' ? notes : '',
