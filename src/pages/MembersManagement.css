@@ -450,6 +450,19 @@ ion-content.modal-content {
 .members-table td .action-icon ion-icon {
   font-size: 1.05rem;
 }
+
+.members-table-footer {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0.75rem 0;
+  gap:12px;
+}
+.members-table-controls { display:flex; align-items:center; gap:12px; }
+.members-table-controls select { background: transparent; color: var(--text-primary, #fff); border: 1px solid rgba(255,255,255,0.06); padding:4px 6px; border-radius:4px; }
+.pagination button { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: var(--text-primary,#fff); padding:6px 8px; margin:0 4px; border-radius:4px; cursor:pointer; }
+.pagination button.active { background: var(--primary-color,#00e676); color:#000; border-color: transparent; }
+.pagination button:disabled { opacity:0.45; cursor:default; }
 .badges {
   display: flex;
   gap: 0.5rem;

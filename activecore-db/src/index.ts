@@ -4403,7 +4403,7 @@ app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
       };
     });
 
-    res.json(transformedMembers);
+    res.json({ data: transformedMembers, total, page, perPage });
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: getErrorMessage(error) });
   }

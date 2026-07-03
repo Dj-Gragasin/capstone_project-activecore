@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -69,7 +69,13 @@ interface Member {
 
 const MembersManagement: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [sortBy, setSortBy] = useState<string>('lastName');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const searchDebounceTimer = useRef<any>(null);
   const [searchText, setSearchText] = useState('');
   const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('all');
   const [showModal, setShowModal] = useState(false);
@@ -105,57 +111,54 @@ const MembersManagement: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Add this line
   const [presentToast] = useIonToast();
 
-  const loadMembers = useCallback(async () => {
+  const loadMembers = useCallback(async (opts?: { page?: number; perPage?: number; sortBy?: string; sortDir?: string; q?: string; status?: string }) => {
+    setLoadingMembers(true);
     try {
-      const res = await fetch(`${API_URL}/members`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+      const p = opts?.page ?? page;
+      const pp = opts?.perPage ?? perPage;
+      const sb = opts?.sortBy ?? sortBy;
+      const sd = opts?.sortDir ?? sortDir;
+      const q = opts?.q ?? searchText;
+      const status = opts?.status ?? (memberStatusFilter === 'all' ? '' : memberStatusFilter);
+
+      const params = new URLSearchParams();
+      params.append('page', String(p));
+      params.append('perPage', String(pp));
+      params.append('sortBy', String(sb));
+      params.append('sortDir', String(sd));
+      if (q && String(q).trim()) params.append('q', String(q).trim());
+      if (status) params.append('status', status);
+
+      const res = await fetch(`${API_URL}/members?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setMembers(data);
+        const json = await res.json();
+        setMembers(json.data || []);
+        setTotalMembers(Number(json.total || 0));
+        setPage(Number(json.page || p));
+        setPerPage(Number(json.perPage || pp));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        presentToast({ message: err.message || 'Failed to load members', duration: 2000, color: 'danger' });
       }
     } catch (error) {
       console.error('Load members error:', error);
-      presentToast({
-        message: 'Failed to load members',
-        duration: 2000,
-        color: 'danger',
-      });
+      presentToast({ message: 'Failed to load members', duration: 2000, color: 'danger' });
+    } finally {
+      setLoadingMembers(false);
     }
-  }, [presentToast]);
+  }, [page, perPage, sortBy, sortDir, searchText, memberStatusFilter, presentToast]);
 
-  const filterMembers = useCallback(() => {
-    let filtered = members;
-
-    if (memberStatusFilter !== 'all') {
-      filtered = filtered.filter(
-        (m) => String(m.status || '').toLowerCase() === memberStatusFilter
-      );
-    }
-
-    if (searchText.trim()) {
-      filtered = filtered.filter(
-        (m) =>
-          m.firstName.toLowerCase().includes(searchText.toLowerCase()) ||
-          m.lastName.toLowerCase().includes(searchText.toLowerCase()) ||
-          m.email.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    setFilteredMembers(filtered);
-  }, [members, searchText, memberStatusFilter]);
-
+  // Load members when relevant params change
   useEffect(() => {
-    loadMembers();
-
+    loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
     const intervalId = window.setInterval(() => {
-      loadMembers();
+      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
     }, 30000);
 
     const handleRefreshMembers = () => {
-      loadMembers();
+      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
     };
 
     window.addEventListener('focus', handleRefreshMembers);
@@ -166,11 +169,19 @@ const MembersManagement: React.FC = () => {
       window.removeEventListener('focus', handleRefreshMembers);
       window.removeEventListener('payments:updated', handleRefreshMembers as EventListener);
     };
-  }, [loadMembers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, perPage, sortBy, sortDir, memberStatusFilter]);
 
+  // Debounced search
   useEffect(() => {
-    filterMembers();
-  }, [filterMembers]);
+    if (searchDebounceTimer.current) clearTimeout(searchDebounceTimer.current);
+    searchDebounceTimer.current = setTimeout(() => {
+      setPage(1);
+      loadMembers({ page: 1, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
+    }, 300);
+    return () => clearTimeout(searchDebounceTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText]);
 
   const handleAddMember = () => {
     setIsEditing(false);
@@ -703,7 +714,9 @@ const MembersManagement: React.FC = () => {
             {/* Members - table list view for better scalability */}
             <IonRow>
               <IonCol size="12">
-                {filteredMembers.length === 0 ? (
+                {loadingMembers ? (
+                  <div className="empty-state">Loading members...</div>
+                ) : members.length === 0 ? (
                   <div className="empty-state">
                     <IonIcon icon={person} />
                     <h3>{emptyStateTitle}</h3>
@@ -714,18 +727,18 @@ const MembersManagement: React.FC = () => {
                     <table className="members-table">
                       <thead>
                         <tr>
-                          <th>Name</th>
-                          <th>Email</th>
+                          <th onClick={() => { if (sortBy === 'firstName') setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortBy('firstName'); setSortDir('asc'); } }} style={{cursor: 'pointer'}}>Name {sortBy === 'firstName' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+                          <th onClick={() => { if (sortBy === 'email') setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortBy('email'); setSortDir('asc'); } }} style={{cursor: 'pointer'}}>Email {sortBy === 'email' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
                           <th>Phone</th>
                           <th>Membership</th>
-                          <th>Price</th>
-                          <th>Status</th>
-                          <th>Payment</th>
+                          <th onClick={() => { if (sortBy === 'membershipPrice') setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortBy('membershipPrice'); setSortDir('asc'); } }} style={{cursor: 'pointer'}}>Price {sortBy === 'membershipPrice' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+                          <th onClick={() => { if (sortBy === 'status') setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortBy('status'); setSortDir('asc'); } }} style={{cursor: 'pointer'}}>Status {sortBy === 'status' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+                          <th onClick={() => { if (sortBy === 'paymentStatus') setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortBy('paymentStatus'); setSortDir('asc'); } }} style={{cursor: 'pointer'}}>Payment {sortBy === 'paymentStatus' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
                           <th style={{ textAlign: 'center' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredMembers.map((member) => (
+                        {members.map((member) => (
                           <tr key={member.id} className="member-row">
                             <td>
                               <div className="name-cell">
@@ -793,6 +806,41 @@ const MembersManagement: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                    <div className="members-table-footer">
+                      <div className="members-table-info">
+                        {totalMembers > 0 ? (
+                          <span>Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, totalMembers)} of {totalMembers}</span>
+                        ) : null}
+                      </div>
+                      <div className="members-table-controls">
+                        <label style={{marginRight:8}}>Per page:</label>
+                        <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+
+                        <div className="pagination">
+                          {(() => {
+                            const totalPages = Math.max(1, Math.ceil(totalMembers / perPage));
+                            const start = Math.max(1, page - 2);
+                            const end = Math.min(totalPages, page + 2);
+                            const pages = [] as number[];
+                            for (let i = start; i <= end; i++) pages.push(i);
+                            return (
+                              <>
+                                <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
+                                {pages.map((p) => (
+                                  <button key={p} className={p === page ? 'active' : ''} onClick={() => setPage(p)}>{p}</button>
+                                ))}
+                                <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </IonCol>
