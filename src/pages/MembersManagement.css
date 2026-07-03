@@ -402,11 +402,24 @@ ion-content.modal-content {
 /* Table view styles */
 .members-table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.members-table-wrapper::-webkit-scrollbar {
+  display: none;
 }
 .members-table {
   width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
   background: var(--card-bg, #1e1e1e);
+  table-layout: auto;
+  word-break: break-word;
+}
+.members-table thead th,
+.members-table tbody td {
+  white-space: normal;
 }
 .members-table thead th {
   text-align: left;
