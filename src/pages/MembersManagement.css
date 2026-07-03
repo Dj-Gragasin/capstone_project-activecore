@@ -470,40 +470,10 @@ ion-content.modal-content {
   align-items:center;
   padding:0.75rem 0;
   gap:12px;
-  flex-wrap: wrap;
 }
-.members-table-controls {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-.members-table-controls label {
-  margin-right:8px;
-  white-space: nowrap;
-}
-.members-table-controls select {
-  background: transparent;
-  color: var(--text-primary, #fff);
-  border: 1px solid rgba(255,255,255,0.06);
-  padding:4px 6px;
-  border-radius:4px;
-}
-.pagination {
-  display:flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.pagination button {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.06);
-  color: var(--text-primary,#fff);
-  padding:6px 8px;
-  margin:0;
-  border-radius:4px;
-  cursor:pointer;
-}
+.members-table-controls { display:flex; align-items:center; gap:12px; }
+.members-table-controls select { background: transparent; color: var(--text-primary, #fff); border: 1px solid rgba(255,255,255,0.06); padding:4px 6px; border-radius:4px; }
+.pagination button { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: var(--text-primary,#fff); padding:6px 8px; margin:0 4px; border-radius:4px; cursor:pointer; }
 .pagination button.active { background: var(--primary-color,#00e676); color:#000; border-color: transparent; }
 .pagination button:disabled { opacity:0.45; cursor:default; }
 .badges {
