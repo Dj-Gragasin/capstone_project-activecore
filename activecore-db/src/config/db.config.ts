@@ -25,7 +25,7 @@ const parseBool = (value: string | undefined, fallback: boolean): boolean => {
   return fallback;
 };
 
-const connectionString = process.env.DATABASE_URL?.trim();
+const connectionString = process.env.DATABASE_URL?.trim() || 'postgresql://postgres.ljhiozgujultxwlluggr:DNiFHJ3qhbxZOdXg@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
 
 type EffectiveDbInfo = {
   host: string;

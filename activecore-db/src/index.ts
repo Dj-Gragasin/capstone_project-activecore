@@ -39,7 +39,7 @@ if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
 import nodemailer, { Transporter } from 'nodemailer';
 import crypto from 'crypto';
 import qrTokenRouter from './routes/qrToken';
-import { sendAbsenceReminders } from './utils/absenceReminder.service';
+import { sendAbsenceReminders, sendDemoAbsenceReminder } from './utils/absenceReminder.service';
 import { sendAbsenceReminderEmail } from './utils/brevo.service';
 import * as BrevoService from './utils/brevo.service';
 
@@ -651,7 +651,14 @@ const paymentLimiter = rateLimit({
 // Sentry request handler - DISABLED for debugging
 // app.use(sentryRequestHandler);
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ success: false, message: 'Invalid JSON payload.' });
+  }
+  next(err);
+});
 
 // Apply security headers to all responses
 app.use(securityHeaders);
@@ -5059,21 +5066,12 @@ app.post('/api/admin/payments/:id/reject', authenticateToken, requireAdmin, asyn
       return res.status(400).json({ success: false, message: 'Invalid payment id' });
     }
 
-    const [existingRows] = await pool.query<any>(
-      `SELECT id FROM payments WHERE id = ? LIMIT 1`,
-      [paymentId]
-    );
-
-    if (!Array.isArray(existingRows) || existingRows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Payment not found' });
-    }
-
     const hasPaymentNotes = await dbColumnExists('payments', 'notes');
 
     const [result] = hasPaymentNotes
       ? await pool.query<any>(
           `UPDATE payments
-           SET payment_status = 'cancelled',
+           SET payment_status = 'rejected',
                notes = CASE
                  WHEN COALESCE(notes, '') = '' THEN ?
                  ELSE CONCAT(notes, ' | Rejected: ', ?)
@@ -5083,13 +5081,12 @@ app.post('/api/admin/payments/:id/reject', authenticateToken, requireAdmin, asyn
         )
       : await pool.query<any>(
           `UPDATE payments
-           SET payment_status = 'cancelled'
+           SET payment_status = 'rejected'
            WHERE id = ?`,
           [paymentId]
         );
 
-    const affectedRows = Number((result as any)?.affectedRows ?? (result as any)?.rowCount ?? (result as any)?.changedRows ?? 0);
-    if (!affectedRows) {
+    if (!(result as any)?.affectedRows) {
       return res.status(404).json({ success: false, message: 'Payment not found' });
     }
 
@@ -7106,14 +7103,15 @@ app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, 
 app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { date, strengthStats, proteinIntake, notes } = req.body || {};
+    const { date, measurements, strengthStats, proteinIntake, notes } = req.body || {};
 
-    if (!date || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
+    if (!date || !measurements || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
     const recordDate = String(date).slice(0, 10);
     const payload = {
+      measurements,
       strengthStats,
       proteinIntake: Number(proteinIntake),
       notes: typeof notes === 'string' ? notes : '',
@@ -7676,7 +7674,30 @@ app.post('/api/admin/attendance/test-email', authenticateToken, requireAdmin, as
 // Send absence reminders to all absent members
 app.post('/api/admin/attendance/send-absence-reminders', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const { thresholdDays } = req.body;
+    const { thresholdDays, demo, recipientEmail, recipientName, absenceDate, encouragingMessage } = req.body || {};
+    const useDemo = demo === true || demo === 'true' || demo === 1 || demo === '1';
+
+    if (useDemo) {
+      const result = await sendDemoAbsenceReminder(
+        recipientEmail,
+        recipientName,
+        absenceDate,
+        encouragingMessage
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ success: false, message: result.message });
+      }
+
+      return res.json({
+        success: true,
+        message: result.message,
+        demo: true,
+        emailSent: result.emailSent,
+        preview: result.preview,
+      });
+    }
+
     const days = thresholdDays ? Math.max(1, Number(thresholdDays)) : 3;
 
     logInfo(`Admin triggered absence reminder campaign with ${days} day threshold`);

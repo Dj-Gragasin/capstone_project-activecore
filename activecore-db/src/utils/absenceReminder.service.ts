@@ -116,6 +116,50 @@ const getDefaultEncouragingMessage = (userName: string, daysAbsent: number): str
 /**
  * Send absence reminders to all absent users
  */
+export const sendDemoAbsenceReminder = async (
+  recipientEmail: string,
+  recipientName: string = 'Member',
+  absenceDate: string = 'today',
+  encouragingMessage?: string
+): Promise<{ success: boolean; message: string; emailSent: boolean; preview?: { subject: string; html: string; text: string } }> => {
+  const normalizedEmail = String(recipientEmail || '').trim();
+  if (!normalizedEmail) {
+    return { success: false, message: 'Recipient email is required.', emailSent: false };
+  }
+
+  const message = (encouragingMessage || '').trim() || 'We miss you at ActiveCore! It has been a while since your last visit, and we would love to welcome you back soon.';
+  const subject = `Absence reminder demo - ${absenceDate || 'today'}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Hi ${recipientName || 'Member'},</h2>
+      <p>We noticed you were absent on <strong>${absenceDate || 'today'}</strong>.</p>
+      <p><em>${message}</em></p>
+      <p>Best regards,<br/>ActiveCore Gym</p>
+    </div>
+  `;
+  const text = `Hi ${recipientName || 'Member'},\n\nWe noticed you were absent on ${absenceDate || 'today'}.\n\n${message}\n\nBest regards,\nActiveCore Gym`;
+
+  const sent = await sendAbsenceReminderEmail(
+    normalizedEmail,
+    recipientName || 'Member',
+    absenceDate || 'today',
+    message
+  );
+
+  return {
+    success: true,
+    emailSent: sent,
+    message: sent
+      ? `Demo absence reminder sent to ${normalizedEmail}`
+      : `Demo absence reminder prepared for ${normalizedEmail}. Email delivery was not confirmed in this environment.`,
+    preview: {
+      subject,
+      html,
+      text,
+    },
+  };
+};
+
 export const sendAbsenceReminders = async (thresholdDays: number = 3): Promise<{
   total: number;
   sent: number;
