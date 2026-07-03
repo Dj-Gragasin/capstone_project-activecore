@@ -753,17 +753,40 @@ const MembersManagement: React.FC = () => {
                               </IonBadge>
                             </td>
                             <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                              <IonButton size="small" fill="solid" color="success" onClick={() => handleRecordPayment(member)}>
-                                <IonIcon icon={card} slot="start" />
-                                Record
+                              <IonButton
+                                size="small"
+                                fill="solid"
+                                color="success"
+                                onClick={() => handleRecordPayment(member)}
+                                title="Record payment"
+                                aria-label={`Record payment for ${member.firstName} ${member.lastName}`}
+                                className="action-icon"
+                              >
+                                <IonIcon icon={card} />
                               </IonButton>
-                              <IonButton size="small" fill="outline" color="primary" onClick={() => handleEditMember(member)}>
-                                <IonIcon icon={create} slot="start" />
-                                Edit
+
+                              <IonButton
+                                size="small"
+                                fill="outline"
+                                color="primary"
+                                onClick={() => handleEditMember(member)}
+                                title="Edit member"
+                                aria-label={`Edit ${member.firstName} ${member.lastName}`}
+                                className="action-icon"
+                              >
+                                <IonIcon icon={create} />
                               </IonButton>
-                              <IonButton size="small" fill="outline" color="danger" onClick={() => member.id && handleDeleteMember(member.id)}>
-                                <IonIcon icon={trash} slot="start" />
-                                Delete
+
+                              <IonButton
+                                size="small"
+                                fill="outline"
+                                color="danger"
+                                onClick={() => member.id && handleDeleteMember(member.id)}
+                                title="Delete member"
+                                aria-label={`Delete ${member.firstName} ${member.lastName}`}
+                                className="action-icon"
+                              >
+                                <IonIcon icon={trash} />
                               </IonButton>
                             </td>
                           </tr>

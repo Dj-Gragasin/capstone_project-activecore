@@ -436,6 +436,20 @@ ion-content.modal-content {
   .members-table tr { margin-bottom: 0.75rem; }
   .members-table td { padding: 0.5rem 0.75rem; border-bottom: none; }
 }
+
+/* Compact icon-only action buttons */
+.members-table td .action-icon {
+  --padding-start: 0.4rem;
+  --padding-end: 0.4rem;
+  height: 34px;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.members-table td .action-icon ion-icon {
+  font-size: 1.05rem;
+}
 .badges {
   display: flex;
   gap: 0.5rem;
