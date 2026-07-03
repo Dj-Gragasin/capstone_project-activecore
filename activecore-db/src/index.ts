@@ -4293,9 +4293,49 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
 // ===== MEMBER MANAGEMENT ROUTES =====
 app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    
-    // PostgreSQL-safe: avoid GROUP BY across many selected columns.
-    // Use a correlated subquery for payment count instead.
+    const pageParam = String(req.query.page || '1');
+    const perPageParam = String(req.query.perPage || '25');
+    const q = String(req.query.q || '').trim();
+    const statusFilter = String(req.query.status || '').toLowerCase().trim();
+    const sortBy = String(req.query.sortBy || 'lastName').trim();
+    const sortDir = String(req.query.sortDir || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+    const page = Math.max(1, Number.isInteger(Number(pageParam)) ? Number(pageParam) : 1);
+    const perPage = Math.min(100, Math.max(1, Number.isInteger(Number(perPageParam)) ? Number(perPageParam) : 25));
+    const offset = (page - 1) * perPage;
+
+    const sortMap: Record<string, string> = {
+      firstName: 'u.first_name',
+      lastName: 'u.last_name',
+      email: 'u.email',
+      phone: 'u.phone',
+      membershipPrice: 'u.membership_price',
+      status: 'u.status',
+      paymentStatus: 'u.payment_status',
+      joinDate: 'u.join_date',
+    };
+    const orderBy = sortMap[sortBy] || 'u.last_name';
+
+    const whereClauses = ['u.role = ?'];
+    const queryParams: any[] = ['member'];
+
+    if (statusFilter === 'active' || statusFilter === 'inactive') {
+      whereClauses.push('u.status = ?');
+      queryParams.push(statusFilter);
+    }
+
+    if (q) {
+      whereClauses.push(
+        `(LOWER(u.first_name) LIKE ? OR LOWER(u.last_name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(u.phone) LIKE ?)`
+      );
+      const searchValue = `%${q.toLowerCase()}%`;
+      queryParams.push(searchValue, searchValue, searchValue, searchValue);
+    }
+
+    const countQuery = `SELECT COUNT(*) AS total FROM users u WHERE ${whereClauses.join(' AND ')}`;
+    const [countRows] = await pool.query<any>(countQuery, queryParams);
+    const total = Number(countRows?.[0]?.total ?? 0);
+
     const [members] = await pool.query<any>(
       `SELECT
         u.id,
@@ -4356,10 +4396,12 @@ app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
         ) as "latestPaidSubscriptionEnd",
         (SELECT COUNT(*) FROM payments p WHERE p.user_id = u.id) as "totalPayments"
       FROM users u
-      WHERE u.role = 'member'`
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY ${orderBy} ${sortDir}
+      LIMIT ? OFFSET ?`,
+      [...queryParams, perPage, offset]
     );
 
-    
     const normalizeMemberStatus = (raw: any): 'active' | 'inactive' => {
       const s = String(raw ?? '').toLowerCase().trim();
       return s === 'active' ? 'active' : 'inactive';
