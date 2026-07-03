@@ -398,6 +398,44 @@ ion-content.modal-content {
 }
 
 /* Enhanced Badges */
+
+/* Table view styles */
+.members-table-wrapper {
+  overflow-x: auto;
+}
+.members-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg, #1e1e1e);
+}
+.members-table thead th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: var(--text-secondary, #cccccc);
+  font-size: 0.9rem;
+}
+.members-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: middle;
+}
+.name-cell { display: flex; align-items: center; gap: 0.75rem; }
+.name-cell .avatar {
+  width: 36px; height: 36px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: var(--primary-gradient, linear-gradient(135deg, #00e676, #00c853));
+}
+.name-cell .avatar ion-icon { color: #000; font-size: 1rem; }
+.name-cell .text .first { font-weight: 700; }
+.name-cell .text .last { opacity: 0.85; font-size: 0.95rem; }
+.member-row:hover { background: rgba(0,230,118,0.02); }
+.members-table td .ion-button { margin-left: 0.35rem; }
+
+@media (max-width: 720px) {
+  .members-table thead { display: none; }
+  .members-table, .members-table tbody, .members-table tr, .members-table td { display: block; width: 100%; }
+  .members-table tr { margin-bottom: 0.75rem; }
+  .members-table td { padding: 0.5rem 0.75rem; border-bottom: none; }
+}
 .badges {
   display: flex;
   gap: 0.5rem;

@@ -700,96 +700,79 @@ const MembersManagement: React.FC = () => {
               </IonCol>
             </IonRow>
 
-            {/* Members */}
+            {/* Members - table list view for better scalability */}
             <IonRow>
-              {filteredMembers.length === 0 ? (
-                <IonCol size="12">
+              <IonCol size="12">
+                {filteredMembers.length === 0 ? (
                   <div className="empty-state">
                     <IonIcon icon={person} />
                     <h3>{emptyStateTitle}</h3>
                     <p>{emptyStateDescription}</p>
                   </div>
-                </IonCol>
-              ) : (
-                filteredMembers.map((member) => (
-                  <IonCol key={member.id} size="12" sizeMd="6" sizeLg="4">
-                    <IonCard className="member-card">
-                      <IonCardHeader>
-                        <div className="member-header">
-                          <div className="member-avatar">
-                            <IonIcon icon={person} aria-hidden="true" />
-                          </div>
-                          <div className="member-info">
-                            <IonCardTitle className="member-name">
-                              <span className="member-first-name">{member.firstName}</span>
-                              <span className="member-last-name">{member.lastName}</span>
-                            </IonCardTitle>
-                            <div className="member-badges">
-                              <IonBadge color={getStatusColor(member.status)}>{String(member.status || '').toUpperCase()}</IonBadge>
+                ) : (
+                  <div className="members-table-wrapper">
+                    <table className="members-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Membership</th>
+                          <th>Price</th>
+                          <th>Status</th>
+                          <th>Payment</th>
+                          <th style={{ textAlign: 'center' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMembers.map((member) => (
+                          <tr key={member.id} className="member-row">
+                            <td>
+                              <div className="name-cell">
+                                <div className="avatar">
+                                  <IonIcon icon={person} />
+                                </div>
+                                <div className="text">
+                                  <div className="first">{member.firstName}</div>
+                                  <div className="last">{member.lastName}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{member.email}</td>
+                            <td>{member.phone}</td>
+                            <td>{member.membershipType}</td>
+                            <td>₱{member.membershipPrice?.toLocaleString()}</td>
+                            <td>
+                              <IonBadge color={getStatusColor(member.status)}>
+                                {String(member.status || '').toUpperCase()}
+                              </IonBadge>
+                            </td>
+                            <td>
                               <IonBadge color={getPaymentStatusColor(member.paymentStatus)}>
                                 {String(member.paymentStatus || 'pending').toUpperCase()}
                               </IonBadge>
-                            </div>
-                          </div>
-                        </div>
-                      </IonCardHeader>
-                      <IonCardContent>
-                        <div className="member-details">
-                          <div className="detail-item">
-                            <IonIcon icon={person} />
-                            <span>{member.email}</span>
-                          </div>
-                          <div className="detail-item">
-                            <IonIcon icon={call} />
-                            <span>{member.phone}</span>
-                          </div>
-                          <div className="detail-item">
-                            <IonIcon icon={fitness} />
-                            <span>{member.membershipType}</span>
-                          </div>
-                          <div className="detail-item">
-                            <IonIcon icon={card} />
-                            <span>₱{member.membershipPrice?.toLocaleString()}</span>
-                          </div>
-                        </div>
-
-                        <div className="member-card-actions">
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            fill="solid"
-                            color="success"
-                            onClick={() => handleRecordPayment(member)}
-                          >
-                            <IonIcon icon={card} slot="start" />
-                            Record
-                          </IonButton>
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            fill="outline"
-                            color="primary"
-                            onClick={() => handleEditMember(member)}
-                          >
-                            <IonIcon icon={create} slot="start" />
-                            Edit
-                          </IonButton>
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            fill="outline"
-                            color="danger"
-                            onClick={() => member.id && handleDeleteMember(member.id)}
-                          >
-                            <IonIcon icon={trash} slot="start" />
-                            Delete
-                          </IonButton>
-                        </div>
-                      </IonCardContent>
-                    </IonCard>
-                  </IonCol>
-                ))
-              )}
+                            </td>
+                            <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                              <IonButton size="small" fill="solid" color="success" onClick={() => handleRecordPayment(member)}>
+                                <IonIcon icon={card} slot="start" />
+                                Record
+                              </IonButton>
+                              <IonButton size="small" fill="outline" color="primary" onClick={() => handleEditMember(member)}>
+                                <IonIcon icon={create} slot="start" />
+                                Edit
+                              </IonButton>
+                              <IonButton size="small" fill="outline" color="danger" onClick={() => member.id && handleDeleteMember(member.id)}>
+                                <IonIcon icon={trash} slot="start" />
+                                Delete
+                              </IonButton>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </IonCol>
             </IonRow>
           </IonGrid>
         </div>
