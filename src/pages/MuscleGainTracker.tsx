@@ -178,6 +178,19 @@ const difficultyProfiles: Record<DifficultyKey, DifficultyProfile> = {
 const MuscleGainTracker: React.FC = () => {
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
+  const [completedDays, setCompletedDays] = useState<Record<SplitKey, boolean>>({
+    push: true,
+    pull: false,
+    legs: false,
+  });
+
+  const weeklyGoal = 4;
+  const completedWorkouts = Object.values(completedDays).filter(Boolean).length;
+  const progressPercent = Math.min(100, Math.round((completedWorkouts / weeklyGoal) * 100));
+
+  const toggleDay = (key: SplitKey) => {
+    setCompletedDays(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <IonPage>
@@ -218,6 +231,19 @@ const MuscleGainTracker: React.FC = () => {
                   <IonLabel>Legs</IonLabel>
                 </IonSegmentButton>
               </IonSegment>
+
+              <div className="planner-grid">
+                {(Object.entries(completedDays) as [SplitKey, boolean][]).map(([key, completed]) => (
+                  <button
+                    key={key}
+                    className={`planner-pill ${completed ? 'planner-pill-active' : ''}`}
+                    onClick={() => toggleDay(key)}
+                  >
+                    <span>{key === 'push' ? 'Push' : key === 'pull' ? 'Pull' : 'Legs'}</span>
+                    <small>{completed ? 'Completed' : 'Planned'}</small>
+                  </button>
+                ))}
+              </div>
 
               <div className="exercise-grid">
                 {splitPlans[activeSplit].map(exercise => (
@@ -291,16 +317,17 @@ const MuscleGainTracker: React.FC = () => {
                 <div className="progress-row">
                   <div>
                     <p className="progress-label">Weekly Goal</p>
-                    <strong>4 workouts</strong>
+                    <strong>{weeklyGoal} workouts</strong>
                   </div>
                   <div>
                     <p className="progress-label">Completed Workouts</p>
-                    <strong>2</strong>
+                    <strong>{completedWorkouts}</strong>
                   </div>
                 </div>
                 <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: '50%' }} />
+                  <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                 </div>
+                <p className="progress-caption">Tap a day card above to mark it as completed and update your weekly progress.</p>
               </IonCardContent>
             </IonCard>
           </div>

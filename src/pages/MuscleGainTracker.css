@@ -67,6 +67,39 @@
   margin-bottom: 12px;
 }
 
+.planner-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.planner-pill {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f7fb;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.planner-pill-active {
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.planner-pill span {
+  font-weight: 700;
+}
+
+.planner-pill small {
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .exercise-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -172,6 +205,13 @@
   height: 100%;
   background: linear-gradient(90deg, #22d3ee, #3b82f6);
   border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.progress-caption {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
 }
 
 @media (max-width: 768px) {
@@ -180,6 +220,7 @@
     align-items: flex-start;
   }
 
+  .planner-grid,
   .exercise-grid,
   .bottom-grid {
     grid-template-columns: 1fr;
