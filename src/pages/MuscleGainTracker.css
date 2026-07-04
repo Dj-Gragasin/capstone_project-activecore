@@ -3,7 +3,7 @@
   color: #f5f7fb;
 }
 
-.tracker-shell {
+.guide-shell {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
@@ -11,7 +11,7 @@
   gap: 20px;
 }
 
-.tracker-hero {
+.guide-hero {
   background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(59, 130, 246, 0.25));
   border: 1px solid rgba(34, 211, 238, 0.2);
   border-radius: 18px;
@@ -31,12 +31,12 @@
   margin: 0 0 6px;
 }
 
-.tracker-hero h2 {
+.guide-hero h2 {
   margin: 0 0 8px;
   font-size: 1.3rem;
 }
 
-.tracker-hero p {
+.guide-hero p {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.5;
@@ -50,201 +50,142 @@
   white-space: nowrap;
 }
 
-.panel {
+.guide-card {
   background: rgba(9, 17, 32, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  padding: 20px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
 }
 
-.summary-panel {
-  height: 100%;
-}
-
-.panel-title {
+.section-title {
   display: flex;
   align-items: center;
   gap: 8px;
   color: #67e8f9;
   font-size: 1.05rem;
   font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.panel-description {
-  color: rgba(255, 255, 255, 0.64);
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-
-.tracker-input {
-  --background: rgba(255, 255, 255, 0.04);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --color: #ffffff;
-  border-radius: 12px;
   margin-bottom: 12px;
 }
 
-.tracker-input ion-label {
-  color: #67e8f9;
-}
-
-.metric-grid,
-.stats-grid {
+.exercise-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-}
-
-.exercise-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 12px 0 16px;
+  margin-top: 16px;
 }
 
 .exercise-card {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 14px;
-  padding: 12px;
+  padding: 14px;
 }
 
-.exercise-card-header {
+.exercise-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.exercise-target {
+  color: #67e8f9;
+  font-size: 0.9rem;
+  margin: 0 0 8px;
+}
+
+.exercise-meta {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.exercise-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
-.add-exercise-btn {
-  margin-bottom: 16px;
-}
-
-.stats-grid {
-  margin: 12px 0 16px;
-}
-
-.stat-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.stat-label {
+.exercise-meta span {
+  background: rgba(34, 211, 238, 0.12);
+  border-radius: 999px;
+  padding: 4px 8px;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.62);
 }
 
-.stat-value {
-  margin-top: 6px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.tip-card {
-  display: flex;
-  gap: 10px;
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid rgba(34, 211, 238, 0.15);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 10px;
-}
-
-.tip-card p {
-  margin: 4px 0 0;
+.exercise-description {
+  margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.4;
 }
 
-.button-row {
+.difficulty-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.difficulty-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.difficulty-panel h3 {
+  margin-top: 0;
+}
+
+.difficulty-panel ul,
+.tip-list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.6;
+}
+
+.bottom-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 20px;
+}
+
+.progress-card {
+  min-height: 100%;
+}
+
+.progress-row {
+  display: flex;
+  justify-content: space-between;
   gap: 12px;
-  margin: 8px 0 20px;
+  margin-bottom: 12px;
 }
 
-.charts-container,
-.table-container {
-  background: rgba(9, 17, 32, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 20px;
+.progress-label {
+  margin: 0 0 4px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
 }
 
-.chart-container {
-  height: 320px;
-  position: relative;
-}
-
-.table-container {
-  overflow-x: auto;
-}
-
-.muscle-gain-content table {
+.progress-bar {
   width: 100%;
-  border-collapse: collapse;
-  color: #ffffff;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
 }
 
-.muscle-gain-content th,
-.muscle-gain-content td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.muscle-gain-content th {
-  color: #67e8f9;
-}
-
-.records-list-wrap {
-  display: none;
-}
-
-.record-card-title {
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.record-card-meta {
-  color: rgba(255, 255, 255, 0.72);
-  margin-bottom: 4px;
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #3b82f6);
+  border-radius: 999px;
 }
 
 @media (max-width: 768px) {
-  .tracker-hero {
+  .guide-hero {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .metric-grid,
-  .stats-grid,
-  .button-row,
-  .exercise-grid {
+  .exercise-grid,
+  .bottom-grid {
     grid-template-columns: 1fr;
   }
 
-  .records-table-wrap {
-    display: none;
-  }
-
-  .records-list-wrap {
-    display: block;
-  }
-
-  .chart-container {
-    height: 280px;
+  .progress-row {
+    flex-direction: column;
   }
 }
