@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -15,15 +15,10 @@ import {
   IonButtons,
   IonMenuButton,
   IonIcon,
-  IonSelect,
   IonCard,
   IonCardContent,
-  IonSelectOption,
 } from '@ionic/react';
-import {
-  barbell,
-  analytics,
-} from 'ionicons/icons';
+import { barbell, analytics, add, remove, nutrition, fitness } from 'ionicons/icons';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,7 +31,7 @@ import {
   Legend,
   ChartOptions,
 } from 'chart.js';
-import { Line, Bar } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import './MuscleGainTracker.css';
 import { API_CONFIG } from '../config/api.config';
 
@@ -53,14 +48,30 @@ ChartJS.register(
   Legend
 );
 
+interface ExerciseEntry {
+  id: string;
+  name: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  notes: string;
+}
+
 interface MuscleGainRecord {
   date: string;
+  measurements?: {
+    bodyWeight?: number;
+    waist?: number;
+    bodyFat?: number;
+  };
   strengthStats: {
     benchPress: number;
     deadlift: number;
     squat: number;
   };
+  exercises?: ExerciseEntry[];
   proteinIntake: number;
+  calories?: number;
   notes: string;
 }
 
@@ -69,27 +80,56 @@ const toNumber = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const createExerciseEntry = (name = ''): ExerciseEntry => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  name,
+  sets: '',
+  reps: '',
+  weight: '',
+  notes: '',
+});
+
 const getStrength = (r: any, key: keyof MuscleGainRecord['strengthStats']): number => {
-  // Supports both canonical shape: r.strengthStats.key and legacy/flattened shape: r.key
   return toNumber(r?.strengthStats?.[key] ?? r?.[key]);
+};
+
+const getRecordExercises = (record: any): ExerciseEntry[] => {
+  if (Array.isArray(record?.exercises)) {
+    return record.exercises;
+  }
+
+  return [];
+};
+
+const getWorkoutVolume = (record: any): number => {
+  const exercises = getRecordExercises(record);
+  if (exercises.length > 0) {
+    return exercises.reduce((sum: number, exercise: any) => {
+      return sum + toNumber(exercise?.weight) * toNumber(exercise?.sets) * toNumber(exercise?.reps);
+    }, 0);
+  }
+
+  return (
+    getStrength(record, 'benchPress') +
+    getStrength(record, 'deadlift') +
+    getStrength(record, 'squat')
+  ) * 3;
 };
 
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [strengthStats, setStrengthStats] = useState({
-    benchPress: '',
-    deadlift: '',
-    squat: ''
-  });
+  const [bodyWeight, setBodyWeight] = useState('');
+  const [waist, setWaist] = useState('');
+  const [bodyFat, setBodyFat] = useState('');
+  const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntry[]>([createExerciseEntry('Bench Press')]);
   const [proteinIntake, setProteinIntake] = useState('');
+  const [calories, setCalories] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedChart, setSelectedChart] = useState('strength');
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
 
-    // If not logged in, fall back to local-only storage.
     if (!token) {
       const stored = localStorage.getItem('muscleGainRecords');
       if (stored) setRecords(JSON.parse(stored));
@@ -106,8 +146,6 @@ const MuscleGainTracker: React.FC = () => {
       }
       setRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
-      // Fallback to local cache so the page still works if offline,
-      // but note: this does NOT sync across devices.
       const stored = localStorage.getItem('muscleGainRecords');
       if (stored) setRecords(JSON.parse(stored));
     }
@@ -117,28 +155,78 @@ const MuscleGainTracker: React.FC = () => {
     loadRecords();
   }, []);
 
+  const updateExercise = (id: string, field: keyof ExerciseEntry, value: string) => {
+    setExerciseEntries(prev =>
+      prev.map(entry => (entry.id === id ? { ...entry, [field]: value } : entry))
+    );
+  };
+
+  const addExercise = () => {
+    setExerciseEntries(prev => [...prev, createExerciseEntry('')]);
+  };
+
+  const removeExercise = (id: string) => {
+    setExerciseEntries(prev => (prev.length > 1 ? prev.filter(entry => entry.id !== id) : prev));
+  };
+
+  const validateInputs = () => {
+    const filledExercises = exerciseEntries.filter(entry => entry.name && entry.sets && entry.reps && entry.weight);
+    return Boolean(date) && filledExercises.length > 0 && proteinIntake;
+  };
+
+  const clearForm = () => {
+    setDate(new Date().toISOString().split('T')[0]);
+    setBodyWeight('');
+    setWaist('');
+    setBodyFat('');
+    setExerciseEntries([createExerciseEntry('Bench Press')]);
+    setProteinIntake('');
+    setCalories('');
+    setNotes('');
+  };
+
   const handleUpdate = () => {
     if (!validateInputs()) {
-      alert('Please fill in all required fields');
+      alert('Please complete the workout details, at least one exercise, and protein intake.');
       return;
     }
 
+    const filledExercises = exerciseEntries.filter(entry => entry.name && entry.sets && entry.reps && entry.weight);
     const newRecord: MuscleGainRecord = {
       date,
-      strengthStats: {
-        benchPress: parseFloat(strengthStats.benchPress),
-        deadlift: parseFloat(strengthStats.deadlift),
-        squat: parseFloat(strengthStats.squat)
+      measurements: {
+        bodyWeight: parseFloat(bodyWeight) || undefined,
+        waist: parseFloat(waist) || undefined,
+        bodyFat: parseFloat(bodyFat) || undefined,
       },
+      strengthStats: {
+        benchPress: Number(
+          filledExercises.find(entry => /bench/i.test(entry.name))?.weight || 0
+        ),
+        deadlift: Number(
+          filledExercises.find(entry => /deadlift/i.test(entry.name))?.weight || 0
+        ),
+        squat: Number(
+          filledExercises.find(entry => /squat/i.test(entry.name))?.weight || 0
+        ),
+      },
+      exercises: filledExercises.map(entry => ({
+        id: entry.id,
+        name: entry.name.trim(),
+        sets: entry.sets,
+        reps: entry.reps,
+        weight: entry.weight,
+        notes: entry.notes,
+      })),
       proteinIntake: parseFloat(proteinIntake),
-      notes
+      calories: parseFloat(calories) || undefined,
+      notes,
     };
 
-    const updatedRecords = [...records, newRecord].sort((a, b) => 
+    const updatedRecords = [...records, newRecord].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Persist to server when logged in; otherwise local-only.
     const token = localStorage.getItem('token') || '';
     if (!token) {
       setRecords(updatedRecords);
@@ -164,37 +252,15 @@ const MuscleGainTracker: React.FC = () => {
 
         const nextRecords = Array.isArray(data.records) ? data.records : updatedRecords;
         setRecords(nextRecords);
-        // keep a local cache as a fallback for offline mode
         localStorage.setItem('muscleGainRecords', JSON.stringify(nextRecords));
         clearForm();
       } catch (e: any) {
-        // If server save fails, keep local so user doesn't lose the entry.
         setRecords(updatedRecords);
         localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
         clearForm();
         alert(`Saved locally only (server sync failed): ${e?.message || 'unknown error'}`);
       }
     })();
-  };
-
-  const validateInputs = () => {
-    return (
-      strengthStats.benchPress &&
-      strengthStats.deadlift &&
-      strengthStats.squat &&
-      proteinIntake
-    );
-  };
-
-  const clearForm = () => {
-    setDate(new Date().toISOString().split('T')[0]);
-    setStrengthStats({
-      benchPress: '',
-      deadlift: '',
-      squat: ''
-    });
-    setProteinIntake('');
-    setNotes('');
   };
 
   const handleDeleteAll = () => {
@@ -227,65 +293,57 @@ const MuscleGainTracker: React.FC = () => {
     }
   };
 
-  const strengthChartData = {
-    labels: records.map(r => r.date),
+  const latestRecord = records[records.length - 1];
+  const totalVolume = records.reduce((sum, record) => sum + getWorkoutVolume(record), 0);
+  const totalExercisesLogged = records.reduce((sum, record) => sum + getRecordExercises(record).length, 0);
+  const averageProtein = records.length > 0 ? Math.round(records.reduce((sum, record) => sum + toNumber(record.proteinIntake), 0) / records.length) : 0;
+
+  const progressChartData = {
+    labels: records.map(record => record.date),
     datasets: [
       {
-        label: 'Bench Press (kg)',
-        data: records.map(r => getStrength(r, 'benchPress')),
-        backgroundColor: '#FF6B6B'
+        label: 'Workout Volume',
+        data: records.map(record => getWorkoutVolume(record)),
+        backgroundColor: 'rgba(34, 211, 238, 0.8)',
+        borderColor: 'rgba(34, 211, 238, 1)',
+        borderWidth: 1,
       },
       {
-        label: 'Deadlift (kg)',
-        data: records.map(r => getStrength(r, 'deadlift')),
-        backgroundColor: '#4ECDC4'
+        label: 'Protein (g)',
+        data: records.map(record => toNumber(record.proteinIntake)),
+        backgroundColor: 'rgba(251, 191, 36, 0.8)',
+        borderColor: 'rgba(251, 191, 36, 1)',
+        borderWidth: 1,
       },
-      {
-        label: 'Squat (kg)',
-        data: records.map(r => getStrength(r, 'squat')),
-        backgroundColor: '#45B7D1'
-      }
-    ]
+    ],
   };
 
-  const chartOptions: ChartOptions<'line' | 'bar'> = {
+  const chartOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       y: {
-        beginAtZero: false,
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)'
-        },
-        ticks: {
-          color: '#ffffff'
-        }
+        beginAtZero: true,
+        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+        ticks: { color: '#ffffff' },
       },
       x: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)'
-        },
-        ticks: {
-          color: '#ffffff'
-        }
-      }
+        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+        ticks: { color: '#ffffff' },
+      },
     },
     plugins: {
       legend: {
         position: 'top',
-        labels: {
-          color: '#ffffff'
-        }
+        labels: { color: '#ffffff' },
       },
       title: {
         display: true,
-        text: 'Strength Progress',
+        text: 'Training Progress',
         color: '#ffffff',
-        font: {
-          size: 16
-        }
-      }
-    }
+        font: { size: 16 },
+      },
+    },
   };
 
   return (
@@ -300,172 +358,226 @@ const MuscleGainTracker: React.FC = () => {
       </IonHeader>
 
       <IonContent className="ion-padding muscle-gain-content">
-        <IonGrid fixed>
-          <IonRow className="form-container">
-            <IonCol size="12" sizeMd="6">
-              <div className="form-section">
-                <div className="form-section-title">
-                  <IonIcon icon={barbell} />
-                  <span>Strength Stats</span>
-                </div>
-                <div className="form-section-description">Record your lifting achievements in kilograms</div>
-                <IonItem>
-                  <IonLabel position="stacked">Date</IonLabel>
-                  <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value!)} />
-                </IonItem>
-                {Object.entries(strengthStats).map(([key, value]) => (
-                  <IonItem key={key}>
-                    <IonLabel position="stacked">{key.replace(/([A-Z])/g, ' $1').trim()} (kg)</IonLabel>
-                    <IonInput
-                      type="number"
-                      value={value}
-                      onIonChange={e =>
-                        setStrengthStats(prev => ({
-                          ...prev,
-                          [key]: e.detail.value!,
-                        }))
-                      }
-                      placeholder={`Enter ${key}`}
-                    />
-                  </IonItem>
-                ))}
-                <IonItem>
-                  <IonLabel position="stacked">Daily Protein Intake (g)</IonLabel>
-                  <IonInput
-                    type="number"
-                    value={proteinIntake}
-                    onIonChange={e => setProteinIntake(e.detail.value!)}
-                    placeholder="Enter daily protein intake"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="stacked">Notes</IonLabel>
-                  <IonInput value={notes} onIonChange={e => setNotes(e.detail.value!)} placeholder="Add any notes" />
-                </IonItem>
-              </div>
-            </IonCol>
-
-            <IonCol size="12" sizeMd="6">
-              <div className="form-section">
-                <div className="form-section-title">
-                  <IonIcon icon={analytics} />
-                  <span>Progress Overview</span>
-                </div>
-                <div className="form-section-description">View your strength progression over time</div>
-              </div>
-            </IonCol>
-          </IonRow>
-
-          <IonRow className="button-container">
-            <IonCol size="12" sizeMd="4">
-              <IonButton expand="block" onClick={clearForm} fill="outline">
-                Clear Form
-              </IonButton>
-            </IonCol>
-            <IonCol size="12" sizeMd="4">
-              <IonButton expand="block" onClick={handleUpdate}>
-                Update Progress
-              </IonButton>
-            </IonCol>
-            <IonCol size="12" sizeMd="4">
-              <IonButton expand="block" onClick={handleDeleteAll} color="danger" fill="outline">
-                Delete All
-              </IonButton>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
-
-        {records.length > 0 && (
-          <div className="charts-container">
-            <div className="chart-controls">
-              <IonItem>
-                <IonLabel>Chart</IonLabel>
-                <IonSelect value={selectedChart} onIonChange={(e) => setSelectedChart(e.detail.value)} interface="popover">
-                  <IonSelectOption value="strength">Strength</IonSelectOption>
-                </IonSelect>
-              </IonItem>
+        <div className="tracker-shell">
+          <div className="tracker-hero">
+            <div>
+              <p className="hero-eyebrow">Fitness-focused training log</p>
+              <h2>Track workouts like a modern gym app.</h2>
+              <p>Log multiple exercises, reps, sets, food intake, and body metrics in one place.</p>
             </div>
-            
-            <div className="chart-container">
-              <Bar key="strength" data={strengthChartData} options={chartOptions as ChartOptions<'bar'>} />
-            </div>
+            <div className="hero-badge">Fit-style layout</div>
           </div>
-        )}
 
-        {records.length > 0 && (
-          <>
-            {/* Desktop/tablet table */}
-            <div className="records-table-wrap">
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <>
-                        <th>Bench</th>
-                        <th>Deadlift</th>
-                        <th>Squat</th>
-                      </>
-                      <th>Protein</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.map((record, index) => (
-                      <tr key={index}>
-                        <td>{record.date}</td>
-                        <>
-                          <td>{getStrength(record, 'benchPress')} kg</td>
-                          <td>{getStrength(record, 'deadlift')} kg</td>
-                          <td>{getStrength(record, 'squat')} kg</td>
-                        </>
-                        <td>{toNumber((record as any)?.proteinIntake)} g</td>
-                      </tr>
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12" sizeLg="7">
+                <div className="panel">
+                  <div className="panel-title">
+                    <IonIcon icon={barbell} />
+                    <span>Workout Entry</span>
+                  </div>
+
+                  <div className="panel-description">Add your training day with exercises, sets, reps, weight, and nutrition.</div>
+
+                  <IonItem className="tracker-input">
+                    <IonLabel position="stacked">Date</IonLabel>
+                    <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value ?? '')} />
+                  </IonItem>
+
+                  <div className="metric-grid">
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Body Weight (kg)</IonLabel>
+                      <IonInput type="number" value={bodyWeight} onIonChange={e => setBodyWeight(e.detail.value ?? '')} placeholder="75" />
+                    </IonItem>
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Waist (cm)</IonLabel>
+                      <IonInput type="number" value={waist} onIonChange={e => setWaist(e.detail.value ?? '')} placeholder="82" />
+                    </IonItem>
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Body Fat (%)</IonLabel>
+                      <IonInput type="number" value={bodyFat} onIonChange={e => setBodyFat(e.detail.value ?? '')} placeholder="16" />
+                    </IonItem>
+                  </div>
+
+                  <div className="exercise-list">
+                    {exerciseEntries.map((entry, index) => (
+                      <div key={entry.id} className="exercise-card">
+                        <div className="exercise-card-header">
+                          <strong>Exercise {index + 1}</strong>
+                          {exerciseEntries.length > 1 && (
+                            <IonButton fill="clear" color="danger" size="small" onClick={() => removeExercise(entry.id)}>
+                              <IonIcon icon={remove} slot="icon-only" />
+                            </IonButton>
+                          )}
+                        </div>
+
+                        <div className="exercise-grid">
+                          <IonItem className="tracker-input">
+                            <IonLabel position="stacked">Exercise Name</IonLabel>
+                            <IonInput value={entry.name} onIonChange={e => updateExercise(entry.id, 'name', e.detail.value ?? '')} placeholder="Pull Ups" />
+                          </IonItem>
+                          <IonItem className="tracker-input">
+                            <IonLabel position="stacked">Sets</IonLabel>
+                            <IonInput type="number" value={entry.sets} onIonChange={e => updateExercise(entry.id, 'sets', e.detail.value ?? '')} placeholder="3" />
+                          </IonItem>
+                          <IonItem className="tracker-input">
+                            <IonLabel position="stacked">Reps</IonLabel>
+                            <IonInput type="number" value={entry.reps} onIonChange={e => updateExercise(entry.id, 'reps', e.detail.value ?? '')} placeholder="10" />
+                          </IonItem>
+                          <IonItem className="tracker-input">
+                            <IonLabel position="stacked">Weight (kg)</IonLabel>
+                            <IonInput type="number" value={entry.weight} onIonChange={e => updateExercise(entry.id, 'weight', e.detail.value ?? '')} placeholder="40" />
+                          </IonItem>
+                        </div>
+
+                        <IonItem className="tracker-input">
+                          <IonLabel position="stacked">Exercise Notes</IonLabel>
+                          <IonInput value={entry.notes} onIonChange={e => updateExercise(entry.id, 'notes', e.detail.value ?? '')} placeholder="Focus on slow tempo" />
+                        </IonItem>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+
+                  <IonButton expand="block" fill="outline" onClick={addExercise} className="add-exercise-btn">
+                    <IonIcon icon={add} slot="start" />
+                    Add Another Exercise
+                  </IonButton>
+
+                  <div className="metric-grid">
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Protein Intake (g)</IonLabel>
+                      <IonInput type="number" value={proteinIntake} onIonChange={e => setProteinIntake(e.detail.value ?? '')} placeholder="180" />
+                    </IonItem>
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Calories</IonLabel>
+                      <IonInput type="number" value={calories} onIonChange={e => setCalories(e.detail.value ?? '')} placeholder="2600" />
+                    </IonItem>
+                  </div>
+
+                  <IonItem className="tracker-input">
+                    <IonLabel position="stacked">Training Notes</IonLabel>
+                    <IonInput value={notes} onIonChange={e => setNotes(e.detail.value ?? '')} placeholder="Energy level, hydration, soreness, and goals" />
+                  </IonItem>
+                </div>
+              </IonCol>
+
+              <IonCol size="12" sizeLg="5">
+                <div className="panel summary-panel">
+                  <div className="panel-title">
+                    <IonIcon icon={analytics} />
+                    <span>Progress Snapshot</span>
+                  </div>
+
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-label">Latest Weight</div>
+                      <div className="stat-value">{latestRecord?.measurements?.bodyWeight ? `${latestRecord.measurements.bodyWeight} kg` : '—'}</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Avg Protein</div>
+                      <div className="stat-value">{averageProtein} g</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Workout Volume</div>
+                      <div className="stat-value">{totalVolume.toFixed(0)} kg</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Exercises Logged</div>
+                      <div className="stat-value">{totalExercisesLogged}</div>
+                    </div>
+                  </div>
+
+                  <div className="tip-card">
+                    <IonIcon icon={nutrition} />
+                    <div>
+                      <strong>Tip</strong>
+                      <p>Pair your lifts with consistent protein intake and recovery to drive muscle gain.</p>
+                    </div>
+                  </div>
+
+                  <div className="tip-card">
+                    <IonIcon icon={fitness} />
+                    <div>
+                      <strong>Goal</strong>
+                      <p>Use the exercise notes section to capture form cues and progression ideas each session.</p>
+                    </div>
+                  </div>
+                </div>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+
+          <div className="button-row">
+            <IonButton expand="block" onClick={clearForm} fill="outline">
+              Clear Form
+            </IonButton>
+            <IonButton expand="block" onClick={handleUpdate}>
+              Save Workout
+            </IonButton>
+            <IonButton expand="block" onClick={handleDeleteAll} color="danger" fill="outline">
+              Delete All
+            </IonButton>
+          </div>
+
+          {records.length > 0 && (
+            <div className="charts-container">
+              <div className="chart-container">
+                <Bar data={progressChartData} options={chartOptions} />
               </div>
             </div>
+          )}
 
-            {/* Mobile stacked cards */}
-            <div className="records-list-wrap">
-              <IonGrid>
-                <IonRow>
-                  {records.map((record, index) => (
-                    <IonCol key={index} size="12" sizeMd="6">
-                      <IonCard>
-                        <IonCardContent>
-                          <div style={{ fontWeight: 700, marginBottom: 10 }}>{record.date}</div>
-                          <IonGrid style={{ padding: 0 }}>
-                            <IonRow>
-                              <>
-                                <IonCol size="6">
-                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Bench</div>
-                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'benchPress')} kg</div>
-                                </IonCol>
-                                <IonCol size="6">
-                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Deadlift</div>
-                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'deadlift')} kg</div>
-                                </IonCol>
-                                <IonCol size="6">
-                                  <div style={{ color: '#b0b0b0', fontSize: 12 }}>Squat</div>
-                                  <div style={{ fontWeight: 700 }}>{getStrength(record, 'squat')} kg</div>
-                                </IonCol>
-                              </>
-                              <IonCol size="6">
-                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>Protein</div>
-                                <div style={{ fontWeight: 700 }}>{toNumber((record as any)?.proteinIntake)} g</div>
-                              </IonCol>
-                            </IonRow>
-                          </IonGrid>
-                        </IonCardContent>
-                      </IonCard>
-                    </IonCol>
-                  ))}
-                </IonRow>
-              </IonGrid>
-            </div>
-          </>
-        )}
+          {records.length > 0 && (
+            <>
+              <div className="records-table-wrap">
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Body Weight</th>
+                        <th>Protein</th>
+                        <th>Exercises</th>
+                        <th>Volume</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {records.map((record, index) => (
+                        <tr key={index}>
+                          <td>{record.date}</td>
+                          <td>{record.measurements?.bodyWeight ? `${record.measurements.bodyWeight} kg` : '—'}</td>
+                          <td>{toNumber(record.proteinIntake)} g</td>
+                          <td>{getRecordExercises(record).length}</td>
+                          <td>{getWorkoutVolume(record).toFixed(0)} kg</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="records-list-wrap">
+                <IonGrid>
+                  <IonRow>
+                    {records.map((record, index) => (
+                      <IonCol key={index} size="12" sizeMd="6">
+                        <IonCard>
+                          <IonCardContent>
+                            <div className="record-card-title">{record.date}</div>
+                            <div className="record-card-meta">Weight: {record.measurements?.bodyWeight ? `${record.measurements.bodyWeight} kg` : '—'}</div>
+                            <div className="record-card-meta">Protein: {toNumber(record.proteinIntake)} g</div>
+                            <div className="record-card-meta">Exercises: {getRecordExercises(record).length}</div>
+                            <div className="record-card-meta">Volume: {getWorkoutVolume(record).toFixed(0)} kg</div>
+                          </IonCardContent>
+                        </IonCard>
+                      </IonCol>
+                    ))}
+                  </IonRow>
+                </IonGrid>
+              </div>
+            </>
+          )}
+        </div>
       </IonContent>
     </IonPage>
   );
