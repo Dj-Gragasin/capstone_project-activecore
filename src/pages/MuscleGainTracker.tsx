@@ -14,8 +14,10 @@ import {
   IonCard,
   IonCardContent,
   IonIcon,
+  IonItem,
+  IonInput,
 } from '@ionic/react';
-import { barbell, bulb, analytics, fitness } from 'ionicons/icons';
+import { barbell, bulb, analytics, fitness, person } from 'ionicons/icons';
 import './MuscleGainTracker.css';
 
 type SplitKey = 'push' | 'pull' | 'legs';
@@ -178,15 +180,19 @@ const difficultyProfiles: Record<DifficultyKey, DifficultyProfile> = {
 const MuscleGainTracker: React.FC = () => {
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
+  const [bodyWeight, setBodyWeight] = useState('70');
+  const [goal, setGoal] = useState('Muscle gain');
+  const [weeklyGoal, setWeeklyGoal] = useState('4');
   const [completedDays, setCompletedDays] = useState<Record<SplitKey, boolean>>({
     push: true,
     pull: false,
     legs: false,
   });
 
-  const weeklyGoal = 4;
+  const parsedGoal = Number(weeklyGoal) || 4;
   const completedWorkouts = Object.values(completedDays).filter(Boolean).length;
-  const progressPercent = Math.min(100, Math.round((completedWorkouts / weeklyGoal) * 100));
+  const progressPercent = Math.min(100, Math.round((completedWorkouts / parsedGoal) * 100));
+  const proteinTarget = Math.max(1, Math.round(Number(bodyWeight) * 1.8));
 
   const toggleDay = (key: SplitKey) => {
     setCompletedDays(prev => ({ ...prev, [key]: !prev[key] }));
@@ -213,6 +219,33 @@ const MuscleGainTracker: React.FC = () => {
             </div>
             <div className="hero-badge">No logging required</div>
           </div>
+
+          <IonCard className="guide-card">
+            <IonCardContent>
+              <div className="section-title">
+                <IonIcon icon={person} />
+                <span>Your Profile</span>
+              </div>
+              <div className="profile-grid">
+                <IonItem className="tracker-input">
+                  <IonLabel position="stacked">Body Weight (kg)</IonLabel>
+                  <IonInput type="number" value={bodyWeight} onIonChange={e => setBodyWeight(e.detail.value ?? '70')} />
+                </IonItem>
+                <IonItem className="tracker-input">
+                  <IonLabel position="stacked">Goal</IonLabel>
+                  <IonInput value={goal} onIonChange={e => setGoal(e.detail.value ?? 'Muscle gain')} />
+                </IonItem>
+                <IonItem className="tracker-input">
+                  <IonLabel position="stacked">Weekly Goal</IonLabel>
+                  <IonInput type="number" value={weeklyGoal} onIonChange={e => setWeeklyGoal(e.detail.value ?? '4')} />
+                </IonItem>
+              </div>
+              <div className="profile-summary">
+                <p>Recommended protein target: <strong>{proteinTarget}g/day</strong></p>
+                <p>Plan focus: <strong>{goal}</strong></p>
+              </div>
+            </IonCardContent>
+          </IonCard>
 
           <IonCard className="guide-card">
             <IonCardContent>
@@ -317,7 +350,7 @@ const MuscleGainTracker: React.FC = () => {
                 <div className="progress-row">
                   <div>
                     <p className="progress-label">Weekly Goal</p>
-                    <strong>{weeklyGoal} workouts</strong>
+                    <strong>{parsedGoal} workouts</strong>
                   </div>
                   <div>
                     <p className="progress-label">Completed Workouts</p>
