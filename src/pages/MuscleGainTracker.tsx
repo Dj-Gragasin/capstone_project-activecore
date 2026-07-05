@@ -82,7 +82,6 @@ interface MuscleGainRecord {
   date: string;
   splitType: SplitKey;
   workoutValues: Record<string, number>;
-  proteinIntake: number;
 }
 
 const splitPlans: Record<SplitKey, ExerciseItem[]> = {
@@ -268,11 +267,37 @@ const getWorkoutValue = (record: any, key: string): number => {
   return toNumber(record?.workoutValues?.[key]);
 };
 
+const normalizeRecord = (record: any): MuscleGainRecord => {
+  const splitType = (record?.splitType as SplitKey) || 'push';
+  const fallbackValues = Object.fromEntries(
+    splitFieldConfig[splitType].fields.map((field, index) => {
+      const legacyValue = record?.workoutValues?.[field.key];
+      if (legacyValue !== undefined && legacyValue !== null) {
+        return [field.key, toNumber(legacyValue)];
+      }
+      const oldStats = record?.strengthStats;
+      const mappedValue = index === 0
+        ? toNumber(oldStats?.benchPress)
+        : index === 1
+          ? toNumber(oldStats?.deadlift)
+          : index === 2
+            ? toNumber(oldStats?.squat)
+            : 0;
+      return [field.key, mappedValue];
+    })
+  );
+
+  return {
+    date: record?.date || '',
+    splitType,
+    workoutValues: fallbackValues,
+  };
+};
+
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
-  const [proteinIntake, setProteinIntake] = useState('');
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [chartSplit, setChartSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
@@ -300,19 +325,13 @@ const MuscleGainTracker: React.FC = () => {
       if (!res.ok || !data?.success) {
         throw new Error(data?.message || 'Failed to load records');
       }
-      const normalized = Array.isArray(data.records)
-        ? data.records.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
-        : [];
+      const normalized = Array.isArray(data.records) ? data.records.map((record: any) => normalizeRecord(record)) : [];
       setRecords(normalized);
     } catch {
       const stored = localStorage.getItem('muscleGainRecords');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setRecords(
-          Array.isArray(parsed)
-            ? parsed.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
-            : []
-        );
+        setRecords(Array.isArray(parsed) ? parsed.map((record: any) => normalizeRecord(record)) : []);
       }
     }
   };
@@ -329,8 +348,7 @@ const MuscleGainTracker: React.FC = () => {
 
   const validateInputs = () => {
     const splitFields = splitFieldConfig[activeSplit].fields.map(field => field.key);
-    const hasWorkoutValue = splitFields.some(fieldKey => Boolean(strengthStats[fieldKey]));
-    return Boolean(hasWorkoutValue && proteinIntake);
+    return splitFields.some(fieldKey => Boolean(strengthStats[fieldKey]));
   };
 
   const clearForm = () => {
@@ -341,7 +359,6 @@ const MuscleGainTracker: React.FC = () => {
         .map(field => [field.key, ''])
     );
     setStrengthStats(emptyStats);
-    setProteinIntake('');
   };
 
   const handleUpdate = () => {
@@ -358,7 +375,6 @@ const MuscleGainTracker: React.FC = () => {
       date,
       splitType: activeSplit,
       workoutValues,
-      proteinIntake: parseFloat(proteinIntake),
     };
 
     const updatedRecords = [...records, newRecord].sort((a, b) =>
@@ -523,15 +539,16 @@ const MuscleGainTracker: React.FC = () => {
                           type="number"
                           value={strengthStats[field.key] ?? ''}
                           onIonChange={e => setStrengthStats(prev => ({ ...prev, [field.key]: e.detail.value ?? '' }))}
-                          placeholder="70"
                         />
                       </IonItem>
                     ))}
                   </div>
-                  <IonItem className="tracker-input">
-                    <IonLabel position="stacked">Daily Protein Intake (g)</IonLabel>
-                    <IonInput type="number" value={proteinIntake} onIonChange={e => setProteinIntake(e.detail.value ?? '')} placeholder="180" />
-                  </IonItem>
+                  <div className="button-row">
+                    <IonButton expand="block" fill="outline" onClick={clearForm}>Clear</IonButton>
+                    <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
+                    <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
+                  </div>
+
                   <div className="difficulty-buttons">
                     {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
                       <IonButton key={level} fill={difficulty === level ? 'solid' : 'outline'} onClick={() => setDifficulty(level)}>
@@ -564,11 +581,6 @@ const MuscleGainTracker: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="button-row">
-                    <IonButton expand="block" fill="outline" onClick={clearForm}>Clear</IonButton>
-                    <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
-                    <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
-                  </div>
                 </div>
               </IonCol>
             </IonRow>
@@ -610,7 +622,6 @@ const MuscleGainTracker: React.FC = () => {
                         <th>Split</th>
                         <th>Main</th>
                         <th>Secondary</th>
-                        <th>Protein</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -620,7 +631,6 @@ const MuscleGainTracker: React.FC = () => {
                           <td>{record.splitType}</td>
                           <td>{splitFieldConfig[record.splitType].fields[0].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[0].key)} kg</td>
                           <td>{splitFieldConfig[record.splitType].fields[1].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[1].key)} kg</td>
-                          <td>{toNumber(record.proteinIntake)} g</td>
                         </tr>
                       ))}
                     </tbody>
@@ -639,7 +649,6 @@ const MuscleGainTracker: React.FC = () => {
                             <div className="record-card-meta">Split: {record.splitType}</div>
                             <div className="record-card-meta">{splitFieldConfig[record.splitType].fields[0].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[0].key)} kg</div>
                             <div className="record-card-meta">{splitFieldConfig[record.splitType].fields[1].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[1].key)} kg</div>
-                            <div className="record-card-meta">Protein: {toNumber(record.proteinIntake)} g</div>
                           </IonCardContent>
                         </IonCard>
                       </IonCol>
