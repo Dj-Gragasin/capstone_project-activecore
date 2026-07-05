@@ -383,8 +383,9 @@ const MuscleGainTracker: React.FC = () => {
 
     const token = localStorage.getItem('token') || '';
     if (!token) {
-      setRecords(updatedRecords);
-      localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+      const normalizedRecords = updatedRecords.map(normalizeRecord);
+      setRecords(normalizedRecords);
+      localStorage.setItem('muscleGainRecords', JSON.stringify(normalizedRecords));
       clearForm();
       return;
     }
@@ -404,13 +405,16 @@ const MuscleGainTracker: React.FC = () => {
           throw new Error(data?.message || 'Failed to save record');
         }
 
-        const nextRecords = Array.isArray(data.records) ? data.records : updatedRecords;
+        const nextRecords = Array.isArray(data.records)
+          ? data.records.map(normalizeRecord)
+          : updatedRecords.map(normalizeRecord);
         setRecords(nextRecords);
         localStorage.setItem('muscleGainRecords', JSON.stringify(nextRecords));
         clearForm();
       } catch (e: any) {
-        setRecords(updatedRecords);
-        localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+        const normalizedRecords = updatedRecords.map(normalizeRecord);
+        setRecords(normalizedRecords);
+        localStorage.setItem('muscleGainRecords', JSON.stringify(normalizedRecords));
         clearForm();
         alert(`Saved locally only (server sync failed): ${e?.message || 'unknown error'}`);
       }
@@ -447,7 +451,9 @@ const MuscleGainTracker: React.FC = () => {
     }
   };
 
-  const selectedChartRecords = records
+  const displayRecords = records.map(normalizeRecord);
+
+  const selectedChartRecords = displayRecords
     .filter(record => record.splitType === chartSplit)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -586,7 +592,7 @@ const MuscleGainTracker: React.FC = () => {
             </IonRow>
           </IonGrid>
 
-          {records.length > 0 && (
+          {displayRecords.length > 0 && (
             <div className="panel chart-panel">
               <div className="section-title">
                 <IonIcon icon={analytics} />
@@ -611,7 +617,7 @@ const MuscleGainTracker: React.FC = () => {
             </div>
           )}
 
-          {records.length > 0 && (
+          {displayRecords.length > 0 && (
             <>
               <div className="records-table-wrap">
                 <div className="table-container">
@@ -624,7 +630,7 @@ const MuscleGainTracker: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {records.map((record, index) => (
+                      {displayRecords.map((record, index) => (
                         <tr key={index}>
                           <td>{record.date}</td>
                           <td>{record.splitType}</td>
@@ -643,7 +649,7 @@ const MuscleGainTracker: React.FC = () => {
               <div className="records-list-wrap">
                 <IonGrid>
                   <IonRow>
-                    {records.map((record, index) => (
+                    {displayRecords.map((record, index) => (
                       <IonCol key={index} size="12" sizeMd="6">
                         <IonCard>
                           <IonCardContent>
