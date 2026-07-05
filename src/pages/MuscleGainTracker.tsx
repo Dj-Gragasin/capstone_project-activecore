@@ -69,6 +69,14 @@ interface DifficultyProfile {
   focus: string;
 }
 
+interface SplitFieldConfig {
+  title: string;
+  primary: string;
+  secondary: string;
+  accessory: string;
+  description: string;
+}
+
 interface MuscleGainRecord {
   date: string;
   strengthStats: {
@@ -215,6 +223,30 @@ const difficultyProfiles: Record<DifficultyKey, DifficultyProfile> = {
     sets: '4–5 sets/exercise',
     load: 'Heavy weights',
     focus: 'Advanced intensity techniques',
+  },
+};
+
+const splitFieldConfig: Record<SplitKey, SplitFieldConfig> = {
+  push: {
+    title: 'Push Day',
+    primary: 'Bench Press (kg)',
+    secondary: 'Incline Press (kg)',
+    accessory: 'Overhead Press (kg)',
+    description: 'Focus on chest, shoulders, and triceps with pressing volume.',
+  },
+  pull: {
+    title: 'Pull Day',
+    primary: 'Deadlift (kg)',
+    secondary: 'Barbell Row (kg)',
+    accessory: 'Lat Pulldown (kg)',
+    description: 'Train your back and biceps with rows, pulls, and arm work.',
+  },
+  legs: {
+    title: 'Leg Day',
+    primary: 'Squat (kg)',
+    secondary: 'Romanian Deadlift (kg)',
+    accessory: 'Leg Press (kg)',
+    description: 'Build lower-body strength with squats, hinges, and leg work.',
   },
 };
 
@@ -426,27 +458,47 @@ const MuscleGainTracker: React.FC = () => {
 
           <IonGrid fixed>
             <IonRow>
-              <IonCol size="12" sizeLg="6">
+              <IonCol size="12">
                 <div className="panel">
                   <div className="section-title">
                     <IonIcon icon={barbell} />
                     <span>Log Your Workout</span>
                   </div>
+
+                  <div className="split-segment-wrap">
+                    <IonSegment value={activeSplit} onIonChange={e => setActiveSplit(e.detail.value as SplitKey)}>
+                      <IonSegmentButton value="push">
+                        <IonLabel>Push</IonLabel>
+                      </IonSegmentButton>
+                      <IonSegmentButton value="pull">
+                        <IonLabel>Pull</IonLabel>
+                      </IonSegmentButton>
+                      <IonSegmentButton value="legs">
+                        <IonLabel>Legs</IonLabel>
+                      </IonSegmentButton>
+                    </IonSegment>
+                  </div>
+
+                  <div className="focus-card">
+                    <div className="focus-card-title">{splitFieldConfig[activeSplit].title}</div>
+                    <p>{splitFieldConfig[activeSplit].description}</p>
+                  </div>
+
                   <IonItem className="tracker-input">
                     <IonLabel position="stacked">Date</IonLabel>
                     <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value ?? '')} />
                   </IonItem>
                   <div className="input-grid">
                     <IonItem className="tracker-input">
-                      <IonLabel position="stacked">Bench Press (kg)</IonLabel>
+                      <IonLabel position="stacked">{splitFieldConfig[activeSplit].primary}</IonLabel>
                       <IonInput type="number" value={strengthStats.benchPress} onIonChange={e => setStrengthStats(prev => ({ ...prev, benchPress: e.detail.value ?? '' }))} placeholder="70" />
                     </IonItem>
                     <IonItem className="tracker-input">
-                      <IonLabel position="stacked">Deadlift (kg)</IonLabel>
+                      <IonLabel position="stacked">{splitFieldConfig[activeSplit].secondary}</IonLabel>
                       <IonInput type="number" value={strengthStats.deadlift} onIonChange={e => setStrengthStats(prev => ({ ...prev, deadlift: e.detail.value ?? '' }))} placeholder="120" />
                     </IonItem>
                     <IonItem className="tracker-input">
-                      <IonLabel position="stacked">Squat (kg)</IonLabel>
+                      <IonLabel position="stacked">{splitFieldConfig[activeSplit].accessory}</IonLabel>
                       <IonInput type="number" value={strengthStats.squat} onIonChange={e => setStrengthStats(prev => ({ ...prev, squat: e.detail.value ?? '' }))} placeholder="90" />
                     </IonItem>
                   </div>
@@ -456,33 +508,8 @@ const MuscleGainTracker: React.FC = () => {
                   </IonItem>
                   <IonItem className="tracker-input">
                     <IonLabel position="stacked">Notes</IonLabel>
-                    <IonInput value={notes} onIonChange={e => setNotes(e.detail.value ?? '')} placeholder="How the workout felt" />
+                    <IonInput value={notes} onIonChange={e => setNotes(e.detail.value ?? '')} placeholder={`How your ${activeSplit} session felt`} />
                   </IonItem>
-                  <div className="button-row">
-                    <IonButton expand="block" fill="outline" onClick={clearForm}>Clear</IonButton>
-                    <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
-                    <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
-                  </div>
-                </div>
-              </IonCol>
-
-              <IonCol size="12" sizeLg="6">
-                <div className="panel">
-                  <div className="section-title">
-                    <IonIcon icon={person} />
-                    <span>PPL Guide</span>
-                  </div>
-                  <IonSegment value={activeSplit} onIonChange={e => setActiveSplit(e.detail.value as SplitKey)}>
-                    <IonSegmentButton value="push">
-                      <IonLabel>Push</IonLabel>
-                    </IonSegmentButton>
-                    <IonSegmentButton value="pull">
-                      <IonLabel>Pull</IonLabel>
-                    </IonSegmentButton>
-                    <IonSegmentButton value="legs">
-                      <IonLabel>Legs</IonLabel>
-                    </IonSegmentButton>
-                  </IonSegment>
 
                   <div className="difficulty-buttons">
                     {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
@@ -514,6 +541,12 @@ const MuscleGainTracker: React.FC = () => {
                         <p className="exercise-description">{exercise.description}</p>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="button-row">
+                    <IonButton expand="block" fill="outline" onClick={clearForm}>Clear</IonButton>
+                    <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
+                    <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
                   </div>
                 </div>
               </IonCol>

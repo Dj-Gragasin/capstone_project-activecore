@@ -93,11 +93,34 @@
   margin-top: 12px;
 }
 
+.split-segment-wrap {
+  margin-bottom: 12px;
+}
+
+.focus-card {
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.focus-card-title {
+  font-weight: 700;
+  color: #67e8f9;
+  margin-bottom: 4px;
+}
+
+.focus-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .difficulty-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 10px 0;
+  margin: 12px 0;
 }
 
 .difficulty-panel {
