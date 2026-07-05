@@ -7145,19 +7145,31 @@ app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, 
 app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { date, measurements, strengthStats, proteinIntake, notes } = req.body || {};
+    const { date, splitType, workoutValues, measurements, strengthStats, proteinIntake, notes } = req.body || {};
 
-    if (!date || !measurements || !strengthStats || proteinIntake === undefined || proteinIntake === null) {
+    const hasNewPayload = Boolean(date && splitType && workoutValues && typeof workoutValues === 'object');
+    const hasLegacyPayload = Boolean(date && measurements && strengthStats && proteinIntake !== undefined && proteinIntake !== null);
+
+    if (!date || (!hasNewPayload && !hasLegacyPayload)) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
     const recordDate = String(date).slice(0, 10);
-    const payload = {
-      measurements,
-      strengthStats,
-      proteinIntake: Number(proteinIntake),
-      notes: typeof notes === 'string' ? notes : '',
-    };
+    const payload = hasNewPayload
+      ? {
+          date: recordDate,
+          splitType,
+          workoutValues: Object.fromEntries(
+            Object.entries(workoutValues || {}).map(([key, value]) => [key, Number(value)])
+          ),
+        }
+      : {
+          date: recordDate,
+          measurements,
+          strengthStats,
+          proteinIntake: Number(proteinIntake),
+          notes: typeof notes === 'string' ? notes : '',
+        };
 
     // Prefer PostgreSQL upsert.
     try {

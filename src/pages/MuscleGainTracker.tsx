@@ -620,8 +620,7 @@ const MuscleGainTracker: React.FC = () => {
                       <tr>
                         <th>Date</th>
                         <th>Split</th>
-                        <th>Main</th>
-                        <th>Secondary</th>
+                        <th>Workouts</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -629,8 +628,11 @@ const MuscleGainTracker: React.FC = () => {
                         <tr key={index}>
                           <td>{record.date}</td>
                           <td>{record.splitType}</td>
-                          <td>{splitFieldConfig[record.splitType].fields[0].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[0].key)} kg</td>
-                          <td>{splitFieldConfig[record.splitType].fields[1].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[1].key)} kg</td>
+                          <td>
+                            {splitFieldConfig[record.splitType].fields.map(field => (
+                              `${field.label}: ${getWorkoutValue(record, field.key)} kg`
+                            )).join(' • ')}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -647,8 +649,11 @@ const MuscleGainTracker: React.FC = () => {
                           <IonCardContent>
                             <div className="record-card-title">{record.date}</div>
                             <div className="record-card-meta">Split: {record.splitType}</div>
-                            <div className="record-card-meta">{splitFieldConfig[record.splitType].fields[0].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[0].key)} kg</div>
-                            <div className="record-card-meta">{splitFieldConfig[record.splitType].fields[1].label}: {getWorkoutValue(record, splitFieldConfig[record.splitType].fields[1].key)} kg</div>
+                            {splitFieldConfig[record.splitType].fields.map(field => (
+                              <div key={field.key} className="record-card-meta">
+                                {field.label}: {getWorkoutValue(record, field.key)} kg
+                              </div>
+                            ))}
                           </IonCardContent>
                         </IonCard>
                       </IonCol>
