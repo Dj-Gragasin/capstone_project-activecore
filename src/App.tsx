@@ -25,6 +25,8 @@ import "./theme/variables.css";
 
 /* Pages */
 import Home from "./pages/Home";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 /* Admin pages */
 import AdminDashboard from "./pages/AdminDashboard";
@@ -299,6 +301,10 @@ const App: React.FC = () => {
                         : "/member"
                     }
                   />
+
+                  {/* Forgot / Reset (public) */}
+                  <Route exact path="/forgot-password" component={ForgotPassword} />
+                  <Route exact path="/reset-password" component={ResetPassword} />
                 );
               }}
             />

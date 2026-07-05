@@ -4119,6 +4119,155 @@ app.post('/api/dev/token', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Ensure password_reset_tokens table exists (id, user_id, token_hash, expires_at)
+ */
+async function ensurePasswordResetTable(): Promise<void> {
+  try {
+    // Postgres-compatible DDL
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    // non-fatal; table creation failure will surface when inserting/selecting
+    logError('Failed ensuring password_reset_tokens table', err);
+  }
+}
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const normalizedEmail = String(email).trim();
+
+    const [users] = await pool.query<any>(
+      'SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+      [normalizedEmail]
+    );
+
+    // Always respond with success to avoid user enumeration.
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.json({ message: 'If an account exists, a reset email has been sent' });
+    }
+
+    const user = users[0];
+
+    // Create table if missing
+    await ensurePasswordResetTable();
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const resetLink = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+    const subject = 'Reset your ActiveCore Gym password';
+    const html = `
+      <html>
+        <body style="font-family: Arial, sans-serif;">
+          <h2>Password reset request</h2>
+          <p>Hi ${user.first_name || ''},</p>
+          <p>We received a request to reset your password. Click the link below to choose a new password. This link expires in one hour.</p>
+          <p><a href="${resetLink}">Reset your password</a></p>
+          <p>If you did not request a password reset, you can safely ignore this email.</p>
+          <p>— ActiveCore Gym</p>
+        </body>
+      </html>
+    `;
+
+    // Send email using existing helper (prefers Brevo)
+    try {
+      await sendEmail(user.email, subject, html);
+    } catch (err) {
+      logError('Failed to send forgot-password email', err);
+    }
+
+    return res.json({ message: 'If an account exists, a reset email has been sent' });
+  } catch (error: any) {
+    logError('Forgot password failed', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    if (!token || typeof token !== 'string' || !newPassword || typeof newPassword !== 'string') {
+      return res.status(400).json({ message: 'Token and newPassword are required' });
+    }
+
+    const pwValidation = validatePassword(newPassword);
+    if (!pwValidation.isValid) {
+      return res.status(400).json({ message: pwValidation.message || 'Password does not meet requirements' });
+    }
+
+    await ensurePasswordResetTable();
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [rows] = await pool.query<any>(
+      'SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token_hash = ? AND expires_at > NOW() LIMIT 1',
+      [tokenHash]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    const row = rows[0];
+    const userId = row.user_id;
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+    // Remove any outstanding reset tokens for this user
+    await pool.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [userId]);
+
+    // Notify user by email about password change
+    try {
+      const [users] = await pool.query<any>('SELECT email, first_name FROM users WHERE id = ? LIMIT 1', [userId]);
+      if (Array.isArray(users) && users.length > 0) {
+        const u = users[0];
+        const subject = 'Your password has been changed';
+        const html = `
+          <html>
+            <body style="font-family: Arial, sans-serif;">
+              <h2>Password changed</h2>
+              <p>Hi ${u.first_name || ''},</p>
+              <p>Your account password was just changed. If this was not you, please contact support immediately.</p>
+              <p>— ActiveCore Gym</p>
+            </body>
+          </html>
+        `;
+        await sendEmail(u.email, subject, html);
+      }
+    } catch (err) {
+      logError('Failed sending password-changed email', err);
+    }
+
+    return res.json({ message: 'Password updated successfully' });
+  } catch (error: any) {
+    logError('Reset password failed', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 app.post('/api/auth/change-password', async (req, res) => {
   try {
     const { userId, currentPassword, newPassword } = req.body;

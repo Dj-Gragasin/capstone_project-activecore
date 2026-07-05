@@ -304,6 +304,9 @@ const Home: React.FC = () => {
                     'Log In'
                   )}
                 </IonButton>
+                <div style={{ marginTop: 8, textAlign: 'center' }}>
+                  <IonButton fill="clear" size="small" onClick={() => router.push('/forgot-password')}>Forgot password?</IonButton>
+                </div>
               </div>
             </form>
           </IonContent>

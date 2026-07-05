@@ -138,3 +138,45 @@ export const ensureToken = async (options?: { devEmail?: string; devUsername?: s
     return null;
   }
 };
+
+export const requestPasswordReset = async (email: string): Promise<any> => {
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await res.json() : { message: await res.text() };
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Request failed');
+    }
+
+    return data;
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to request password reset');
+  }
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<any> => {
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await res.json() : { message: await res.text() };
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Reset failed');
+    }
+
+    return data;
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to reset password');
+  }
+};
