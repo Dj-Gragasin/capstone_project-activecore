@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -16,9 +16,39 @@ import {
   IonIcon,
   IonItem,
   IonInput,
+  IonGrid,
+  IonRow,
+  IonCol,
 } from '@ionic/react';
-import { barbell, bulb, analytics, fitness, person } from 'ionicons/icons';
+import { barbell, analytics, person } from 'ionicons/icons';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartOptions,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
 import './MuscleGainTracker.css';
+import { API_CONFIG } from '../config/api.config';
+
+const API_URL = API_CONFIG.BASE_URL;
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 type SplitKey = 'push' | 'pull' | 'legs';
 type DifficultyKey = 'beginner' | 'intermediate' | 'advanced';
@@ -37,6 +67,17 @@ interface DifficultyProfile {
   sets: string;
   load: string;
   focus: string;
+}
+
+interface MuscleGainRecord {
+  date: string;
+  strengthStats: {
+    benchPress: number;
+    deadlift: number;
+    squat: number;
+  };
+  proteinIntake: number;
+  notes: string;
 }
 
 const splitPlans: Record<SplitKey, ExerciseItem[]> = {
@@ -177,25 +218,188 @@ const difficultyProfiles: Record<DifficultyKey, DifficultyProfile> = {
   },
 };
 
+const toNumber = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const getStrength = (r: any, key: keyof MuscleGainRecord['strengthStats']): number => {
+  return toNumber(r?.strengthStats?.[key] ?? r?.[key]);
+};
+
 const MuscleGainTracker: React.FC = () => {
+  const [records, setRecords] = useState<MuscleGainRecord[]>([]);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [strengthStats, setStrengthStats] = useState({ benchPress: '', deadlift: '', squat: '' });
+  const [proteinIntake, setProteinIntake] = useState('');
+  const [notes, setNotes] = useState('');
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
-  const [bodyWeight, setBodyWeight] = useState('70');
-  const [goal, setGoal] = useState('Muscle gain');
-  const [weeklyGoal, setWeeklyGoal] = useState('4');
-  const [completedDays, setCompletedDays] = useState<Record<SplitKey, boolean>>({
-    push: true,
-    pull: false,
-    legs: false,
-  });
 
-  const parsedGoal = Number(weeklyGoal) || 4;
-  const completedWorkouts = Object.values(completedDays).filter(Boolean).length;
-  const progressPercent = Math.min(100, Math.round((completedWorkouts / parsedGoal) * 100));
-  const proteinTarget = Math.max(1, Math.round(Number(bodyWeight) * 1.8));
+  const loadRecords = async () => {
+    const token = localStorage.getItem('token') || '';
+    if (!token) {
+      const stored = localStorage.getItem('muscleGainRecords');
+      if (stored) setRecords(JSON.parse(stored));
+      return;
+    }
 
-  const toggleDay = (key: SplitKey) => {
-    setCompletedDays(prev => ({ ...prev, [key]: !prev[key] }));
+    try {
+      const res = await fetch(`${API_URL}/muscle-gain/records`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || 'Failed to load records');
+      }
+      setRecords(Array.isArray(data.records) ? data.records : []);
+    } catch {
+      const stored = localStorage.getItem('muscleGainRecords');
+      if (stored) setRecords(JSON.parse(stored));
+    }
+  };
+
+  useEffect(() => {
+    loadRecords();
+  }, []);
+
+  const validateInputs = () => {
+    return Boolean(strengthStats.benchPress && strengthStats.deadlift && strengthStats.squat && proteinIntake);
+  };
+
+  const clearForm = () => {
+    setDate(new Date().toISOString().split('T')[0]);
+    setStrengthStats({ benchPress: '', deadlift: '', squat: '' });
+    setProteinIntake('');
+    setNotes('');
+  };
+
+  const handleUpdate = () => {
+    if (!validateInputs()) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+
+    const newRecord: MuscleGainRecord = {
+      date,
+      strengthStats: {
+        benchPress: parseFloat(strengthStats.benchPress),
+        deadlift: parseFloat(strengthStats.deadlift),
+        squat: parseFloat(strengthStats.squat),
+      },
+      proteinIntake: parseFloat(proteinIntake),
+      notes,
+    };
+
+    const updatedRecords = [...records, newRecord].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    const token = localStorage.getItem('token') || '';
+    if (!token) {
+      setRecords(updatedRecords);
+      localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+      clearForm();
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/muscle-gain/records`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(newRecord),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message || 'Failed to save record');
+        }
+
+        const nextRecords = Array.isArray(data.records) ? data.records : updatedRecords;
+        setRecords(nextRecords);
+        localStorage.setItem('muscleGainRecords', JSON.stringify(nextRecords));
+        clearForm();
+      } catch (e: any) {
+        setRecords(updatedRecords);
+        localStorage.setItem('muscleGainRecords', JSON.stringify(updatedRecords));
+        clearForm();
+        alert(`Saved locally only (server sync failed): ${e?.message || 'unknown error'}`);
+      }
+    })();
+  };
+
+  const handleDeleteAll = () => {
+    if (window.confirm('Are you sure you want to delete all records?')) {
+      const token = localStorage.getItem('token') || '';
+      if (!token) {
+        setRecords([]);
+        localStorage.removeItem('muscleGainRecords');
+        clearForm();
+        return;
+      }
+
+      (async () => {
+        try {
+          const res = await fetch(`${API_URL}/muscle-gain/records`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok || !data?.success) {
+            throw new Error(data?.message || 'Failed to delete records');
+          }
+          setRecords([]);
+          localStorage.removeItem('muscleGainRecords');
+          clearForm();
+        } catch (e: any) {
+          alert(`Failed to delete from server: ${e?.message || 'unknown error'}`);
+        }
+      })();
+    }
+  };
+
+  const chartData = {
+    labels: records.map(record => record.date),
+    datasets: [
+      {
+        label: 'Bench Press (kg)',
+        data: records.map(record => getStrength(record, 'benchPress')),
+        backgroundColor: '#FF6B6B',
+      },
+      {
+        label: 'Deadlift (kg)',
+        data: records.map(record => getStrength(record, 'deadlift')),
+        backgroundColor: '#4ECDC4',
+      },
+      {
+        label: 'Squat (kg)',
+        data: records.map(record => getStrength(record, 'squat')),
+        backgroundColor: '#45B7D1',
+      },
+    ],
+  };
+
+  const chartOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: false,
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: '#ffffff' },
+      },
+      x: {
+        grid: { color: 'rgba(255,255,255,0.1)' },
+        ticks: { color: '#ffffff' },
+      },
+    },
+    plugins: {
+      legend: { position: 'top', labels: { color: '#ffffff' } },
+      title: { display: true, text: 'Strength Progress', color: '#ffffff', font: { size: 16 } },
+    },
   };
 
   return (
@@ -205,165 +409,179 @@ const MuscleGainTracker: React.FC = () => {
           <IonButtons slot="start">
             <IonMenuButton />
           </IonButtons>
-          <IonTitle>Muscle Gain Guide</IonTitle>
+          <IonTitle>Muscle Gain Tracker</IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding muscle-gain-content">
-        <div className="guide-shell">
-          <div className="guide-hero">
+        <div className="tracker-shell">
+          <div className="tracker-hero">
             <div>
-              <p className="hero-eyebrow">Educational PPL guide</p>
-              <h2>Build muscle with a simple Push-Pull-Legs structure.</h2>
-              <p>This page is designed as a workout reference for users who want a clear muscle-gain plan.</p>
+              <p className="hero-eyebrow">Workout log + PPL guide</p>
+              <h2>Track your lifts and follow a Push-Pull-Legs structure.</h2>
+              <p>Log your progress with a strength chart while using the PPL split for your next training focus.</p>
             </div>
-            <div className="hero-badge">No logging required</div>
+            <div className="hero-badge">Hybrid layout</div>
           </div>
 
-          <IonCard className="guide-card">
-            <IonCardContent>
-              <div className="section-title">
-                <IonIcon icon={person} />
-                <span>Your Profile</span>
-              </div>
-              <div className="profile-grid">
-                <IonItem className="tracker-input">
-                  <IonLabel position="stacked">Body Weight (kg)</IonLabel>
-                  <IonInput type="number" value={bodyWeight} onIonChange={e => setBodyWeight(e.detail.value ?? '70')} />
-                </IonItem>
-                <IonItem className="tracker-input">
-                  <IonLabel position="stacked">Goal</IonLabel>
-                  <IonInput value={goal} onIonChange={e => setGoal(e.detail.value ?? 'Muscle gain')} />
-                </IonItem>
-                <IonItem className="tracker-input">
-                  <IonLabel position="stacked">Weekly Goal</IonLabel>
-                  <IonInput type="number" value={weeklyGoal} onIonChange={e => setWeeklyGoal(e.detail.value ?? '4')} />
-                </IonItem>
-              </div>
-              <div className="profile-summary">
-                <p>Recommended protein target: <strong>{proteinTarget}g/day</strong></p>
-                <p>Plan focus: <strong>{goal}</strong></p>
-              </div>
-            </IonCardContent>
-          </IonCard>
-
-          <IonCard className="guide-card">
-            <IonCardContent>
-              <div className="section-title">
-                <IonIcon icon={barbell} />
-                <span>Workout Split</span>
-              </div>
-              <IonSegment value={activeSplit} onIonChange={e => setActiveSplit(e.detail.value as SplitKey)}>
-                <IonSegmentButton value="push">
-                  <IonLabel>Push</IonLabel>
-                </IonSegmentButton>
-                <IonSegmentButton value="pull">
-                  <IonLabel>Pull</IonLabel>
-                </IonSegmentButton>
-                <IonSegmentButton value="legs">
-                  <IonLabel>Legs</IonLabel>
-                </IonSegmentButton>
-              </IonSegment>
-
-              <div className="planner-grid">
-                {(Object.entries(completedDays) as [SplitKey, boolean][]).map(([key, completed]) => (
-                  <button
-                    key={key}
-                    className={`planner-pill ${completed ? 'planner-pill-active' : ''}`}
-                    onClick={() => toggleDay(key)}
-                  >
-                    <span>{key === 'push' ? 'Push' : key === 'pull' ? 'Pull' : 'Legs'}</span>
-                    <small>{completed ? 'Completed' : 'Planned'}</small>
-                  </button>
-                ))}
-              </div>
-
-              <div className="exercise-grid">
-                {splitPlans[activeSplit].map(exercise => (
-                  <div key={exercise.name} className="exercise-card">
-                    <h3>{exercise.name}</h3>
-                    <p className="exercise-target">{exercise.target}</p>
-                    <div className="exercise-meta">
-                      <span>{exercise.sets}</span>
-                      <span>{exercise.reps}</span>
-                    </div>
-                    <p className="exercise-description">{exercise.description}</p>
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12" sizeLg="6">
+                <div className="panel">
+                  <div className="section-title">
+                    <IonIcon icon={barbell} />
+                    <span>Log Your Workout</span>
                   </div>
-                ))}
-              </div>
-            </IonCardContent>
-          </IonCard>
-
-          <IonCard className="guide-card">
-            <IonCardContent>
-              <div className="section-title">
-                <IonIcon icon={fitness} />
-                <span>Difficulty Level</span>
-              </div>
-              <div className="difficulty-buttons">
-                {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
-                  <IonButton
-                    key={level}
-                    fill={difficulty === level ? 'solid' : 'outline'}
-                    onClick={() => setDifficulty(level)}
-                  >
-                    {difficultyProfiles[level].title}
-                  </IonButton>
-                ))}
-              </div>
-
-              <div className="difficulty-panel">
-                <h3>{difficultyProfiles[difficulty].title}</h3>
-                <ul>
-                  <li><strong>Frequency:</strong> {difficultyProfiles[difficulty].days}</li>
-                  <li><strong>Volume:</strong> {difficultyProfiles[difficulty].sets}</li>
-                  <li><strong>Load:</strong> {difficultyProfiles[difficulty].load}</li>
-                  <li><strong>Focus:</strong> {difficultyProfiles[difficulty].focus}</li>
-                </ul>
-              </div>
-            </IonCardContent>
-          </IonCard>
-
-          <div className="bottom-grid">
-            <IonCard className="guide-card">
-              <IonCardContent>
-                <div className="section-title">
-                  <IonIcon icon={bulb} />
-                  <span>Muscle Gain Tips</span>
-                </div>
-                <ul className="tip-list">
-                  <li>Consume 1.6–2.2 g protein per kg of body weight daily.</li>
-                  <li>Eat enough calories to support muscle growth.</li>
-                  <li>Sleep 7–9 hours each night.</li>
-                  <li>Rest each muscle group for 48–72 hours.</li>
-                  <li>Increase weight gradually while keeping proper form.</li>
-                </ul>
-              </IonCardContent>
-            </IonCard>
-
-            <IonCard className="guide-card progress-card">
-              <IonCardContent>
-                <div className="section-title">
-                  <IonIcon icon={analytics} />
-                  <span>Progress</span>
-                </div>
-                <div className="progress-row">
-                  <div>
-                    <p className="progress-label">Weekly Goal</p>
-                    <strong>{parsedGoal} workouts</strong>
+                  <IonItem className="tracker-input">
+                    <IonLabel position="stacked">Date</IonLabel>
+                    <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value ?? '')} />
+                  </IonItem>
+                  <div className="input-grid">
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Bench Press (kg)</IonLabel>
+                      <IonInput type="number" value={strengthStats.benchPress} onIonChange={e => setStrengthStats(prev => ({ ...prev, benchPress: e.detail.value ?? '' }))} placeholder="70" />
+                    </IonItem>
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Deadlift (kg)</IonLabel>
+                      <IonInput type="number" value={strengthStats.deadlift} onIonChange={e => setStrengthStats(prev => ({ ...prev, deadlift: e.detail.value ?? '' }))} placeholder="120" />
+                    </IonItem>
+                    <IonItem className="tracker-input">
+                      <IonLabel position="stacked">Squat (kg)</IonLabel>
+                      <IonInput type="number" value={strengthStats.squat} onIonChange={e => setStrengthStats(prev => ({ ...prev, squat: e.detail.value ?? '' }))} placeholder="90" />
+                    </IonItem>
                   </div>
-                  <div>
-                    <p className="progress-label">Completed Workouts</p>
-                    <strong>{completedWorkouts}</strong>
+                  <IonItem className="tracker-input">
+                    <IonLabel position="stacked">Daily Protein Intake (g)</IonLabel>
+                    <IonInput type="number" value={proteinIntake} onIonChange={e => setProteinIntake(e.detail.value ?? '')} placeholder="180" />
+                  </IonItem>
+                  <IonItem className="tracker-input">
+                    <IonLabel position="stacked">Notes</IonLabel>
+                    <IonInput value={notes} onIonChange={e => setNotes(e.detail.value ?? '')} placeholder="How the workout felt" />
+                  </IonItem>
+                  <div className="button-row">
+                    <IonButton expand="block" fill="outline" onClick={clearForm}>Clear</IonButton>
+                    <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
+                    <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
                   </div>
                 </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+              </IonCol>
+
+              <IonCol size="12" sizeLg="6">
+                <div className="panel">
+                  <div className="section-title">
+                    <IonIcon icon={person} />
+                    <span>PPL Guide</span>
+                  </div>
+                  <IonSegment value={activeSplit} onIonChange={e => setActiveSplit(e.detail.value as SplitKey)}>
+                    <IonSegmentButton value="push">
+                      <IonLabel>Push</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="pull">
+                      <IonLabel>Pull</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="legs">
+                      <IonLabel>Legs</IonLabel>
+                    </IonSegmentButton>
+                  </IonSegment>
+
+                  <div className="difficulty-buttons">
+                    {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
+                      <IonButton key={level} fill={difficulty === level ? 'solid' : 'outline'} onClick={() => setDifficulty(level)}>
+                        {difficultyProfiles[level].title}
+                      </IonButton>
+                    ))}
+                  </div>
+
+                  <div className="difficulty-panel">
+                    <h3>{difficultyProfiles[difficulty].title}</h3>
+                    <ul>
+                      <li><strong>Frequency:</strong> {difficultyProfiles[difficulty].days}</li>
+                      <li><strong>Volume:</strong> {difficultyProfiles[difficulty].sets}</li>
+                      <li><strong>Load:</strong> {difficultyProfiles[difficulty].load}</li>
+                      <li><strong>Focus:</strong> {difficultyProfiles[difficulty].focus}</li>
+                    </ul>
+                  </div>
+
+                  <div className="exercise-grid">
+                    {splitPlans[activeSplit].map(exercise => (
+                      <div key={exercise.name} className="exercise-card">
+                        <h3>{exercise.name}</h3>
+                        <p className="exercise-target">{exercise.target}</p>
+                        <div className="exercise-meta">
+                          <span>{exercise.sets}</span>
+                          <span>{exercise.reps}</span>
+                        </div>
+                        <p className="exercise-description">{exercise.description}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <p className="progress-caption">Tap a day card above to mark it as completed and update your weekly progress.</p>
-              </IonCardContent>
-            </IonCard>
-          </div>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+
+          {records.length > 0 && (
+            <div className="panel chart-panel">
+              <div className="section-title">
+                <IonIcon icon={analytics} />
+                <span>Progress Chart</span>
+              </div>
+              <div className="chart-container">
+                <Bar data={chartData} options={chartOptions} />
+              </div>
+            </div>
+          )}
+
+          {records.length > 0 && (
+            <>
+              <div className="records-table-wrap">
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Bench</th>
+                        <th>Deadlift</th>
+                        <th>Squat</th>
+                        <th>Protein</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {records.map((record, index) => (
+                        <tr key={index}>
+                          <td>{record.date}</td>
+                          <td>{getStrength(record, 'benchPress')} kg</td>
+                          <td>{getStrength(record, 'deadlift')} kg</td>
+                          <td>{getStrength(record, 'squat')} kg</td>
+                          <td>{toNumber(record.proteinIntake)} g</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="records-list-wrap">
+                <IonGrid>
+                  <IonRow>
+                    {records.map((record, index) => (
+                      <IonCol key={index} size="12" sizeMd="6">
+                        <IonCard>
+                          <IonCardContent>
+                            <div className="record-card-title">{record.date}</div>
+                            <div className="record-card-meta">Bench: {getStrength(record, 'benchPress')} kg</div>
+                            <div className="record-card-meta">Deadlift: {getStrength(record, 'deadlift')} kg</div>
+                            <div className="record-card-meta">Squat: {getStrength(record, 'squat')} kg</div>
+                            <div className="record-card-meta">Protein: {toNumber(record.proteinIntake)} g</div>
+                          </IonCardContent>
+                        </IonCard>
+                      </IonCol>
+                    ))}
+                  </IonRow>
+                </IonGrid>
+              </div>
+            </>
+          )}
         </div>
       </IonContent>
     </IonPage>

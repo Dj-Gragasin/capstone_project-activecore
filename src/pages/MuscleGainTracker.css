@@ -3,7 +3,7 @@
   color: #f5f7fb;
 }
 
-.guide-shell {
+.tracker-shell {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
@@ -11,8 +11,8 @@
   gap: 20px;
 }
 
-.guide-hero {
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(59, 130, 246, 0.25));
+.tracker-hero {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(59, 130, 246, 0.26));
   border: 1px solid rgba(34, 211, 238, 0.2);
   border-radius: 18px;
   padding: 24px;
@@ -31,12 +31,12 @@
   margin: 0 0 6px;
 }
 
-.guide-hero h2 {
+.tracker-hero h2 {
   margin: 0 0 8px;
   font-size: 1.3rem;
 }
 
-.guide-hero p {
+.tracker-hero p {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.5;
@@ -50,10 +50,11 @@
   white-space: nowrap;
 }
 
-.guide-card {
+.panel {
   background: rgba(9, 17, 32, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
+  padding: 20px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
 }
 
@@ -67,7 +68,7 @@
   margin-bottom: 12px;
 }
 
-.profile-grid {
+.input-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -78,62 +79,49 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --color: #ffffff;
   border-radius: 12px;
+  margin-bottom: 10px;
 }
 
 .tracker-input ion-label {
   color: #67e8f9;
 }
 
-.profile-summary {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: rgba(34, 211, 238, 0.1);
-  border-radius: 12px;
-  color: rgba(255, 255, 255, 0.84);
-}
-
-.profile-summary p {
-  margin: 4px 0;
-}
-
-.planner-grid {
+.button-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin: 16px 0;
+  margin-top: 12px;
 }
 
-.planner-pill {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f5f7fb;
-  border-radius: 12px;
-  padding: 10px;
+.difficulty-buttons {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  cursor: pointer;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
 }
 
-.planner-pill-active {
-  background: rgba(34, 211, 238, 0.16);
-  border-color: rgba(34, 211, 238, 0.4);
+.difficulty-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
 }
 
-.planner-pill span {
-  font-weight: 700;
+.difficulty-panel h3 {
+  margin-top: 0;
 }
 
-.planner-pill small {
-  color: rgba(255, 255, 255, 0.7);
+.difficulty-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.6;
 }
 
 .exercise-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 16px;
 }
 
 .exercise-card {
@@ -174,89 +162,75 @@
   line-height: 1.4;
 }
 
-.difficulty-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+.chart-panel {
+  margin-top: 4px;
 }
 
-.difficulty-panel {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 14px;
+.chart-container {
+  height: 320px;
+  position: relative;
 }
 
-.difficulty-panel h3 {
-  margin-top: 0;
+.table-container {
+  background: rgba(9, 17, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  overflow-x: auto;
 }
 
-.difficulty-panel ul,
-.tip-list {
-  margin: 0;
-  padding-left: 18px;
-  color: rgba(255, 255, 255, 0.78);
-  line-height: 1.6;
-}
-
-.bottom-grid {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 20px;
-}
-
-.progress-card {
-  min-height: 100%;
-}
-
-.progress-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.progress-label {
-  margin: 0 0 4px;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.85rem;
-}
-
-.progress-bar {
+.muscle-gain-content table {
   width: 100%;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  overflow: hidden;
+  border-collapse: collapse;
+  color: #ffffff;
 }
 
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #22d3ee, #3b82f6);
-  border-radius: 999px;
-  transition: width 0.2s ease;
+.muscle-gain-content th,
+.muscle-gain-content td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.progress-caption {
-  margin: 8px 0 0;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9rem;
+.muscle-gain-content th {
+  color: #67e8f9;
+}
+
+.records-list-wrap {
+  display: none;
+}
+
+.record-card-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.record-card-meta {
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 4px;
 }
 
 @media (max-width: 768px) {
-  .guide-hero {
+  .tracker-hero {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .profile-grid,
-  .planner-grid,
-  .exercise-grid,
-  .bottom-grid {
+  .input-grid,
+  .button-row,
+  .exercise-grid {
     grid-template-columns: 1fr;
   }
 
-  .progress-row {
-    flex-direction: column;
+  .records-table-wrap {
+    display: none;
+  }
+
+  .records-list-wrap {
+    display: block;
+  }
+
+  .chart-container {
+    height: 280px;
   }
 }
