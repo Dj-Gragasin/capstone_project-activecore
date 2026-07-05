@@ -20,7 +20,7 @@ import {
   IonRow,
   IonCol,
 } from '@ionic/react';
-import { barbell, analytics, person } from 'ionicons/icons';
+import { barbell, analytics } from 'ionicons/icons';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -79,13 +79,13 @@ interface SplitFieldConfig {
 
 interface MuscleGainRecord {
   date: string;
+  splitType: SplitKey;
   strengthStats: {
     benchPress: number;
     deadlift: number;
     squat: number;
   };
   proteinIntake: number;
-  notes: string;
 }
 
 const splitPlans: Record<SplitKey, ExerciseItem[]> = {
@@ -264,7 +264,6 @@ const MuscleGainTracker: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [strengthStats, setStrengthStats] = useState({ benchPress: '', deadlift: '', squat: '' });
   const [proteinIntake, setProteinIntake] = useState('');
-  const [notes, setNotes] = useState('');
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
 
@@ -272,7 +271,14 @@ const MuscleGainTracker: React.FC = () => {
     const token = localStorage.getItem('token') || '';
     if (!token) {
       const stored = localStorage.getItem('muscleGainRecords');
-      if (stored) setRecords(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setRecords(
+          Array.isArray(parsed)
+            ? parsed.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
+            : []
+        );
+      }
       return;
     }
 
@@ -284,10 +290,20 @@ const MuscleGainTracker: React.FC = () => {
       if (!res.ok || !data?.success) {
         throw new Error(data?.message || 'Failed to load records');
       }
-      setRecords(Array.isArray(data.records) ? data.records : []);
+      const normalized = Array.isArray(data.records)
+        ? data.records.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
+        : [];
+      setRecords(normalized);
     } catch {
       const stored = localStorage.getItem('muscleGainRecords');
-      if (stored) setRecords(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setRecords(
+          Array.isArray(parsed)
+            ? parsed.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
+            : []
+        );
+      }
     }
   };
 
@@ -303,7 +319,6 @@ const MuscleGainTracker: React.FC = () => {
     setDate(new Date().toISOString().split('T')[0]);
     setStrengthStats({ benchPress: '', deadlift: '', squat: '' });
     setProteinIntake('');
-    setNotes('');
   };
 
   const handleUpdate = () => {
@@ -314,13 +329,13 @@ const MuscleGainTracker: React.FC = () => {
 
     const newRecord: MuscleGainRecord = {
       date,
+      splitType: activeSplit,
       strengthStats: {
         benchPress: parseFloat(strengthStats.benchPress),
         deadlift: parseFloat(strengthStats.deadlift),
         squat: parseFloat(strengthStats.squat),
       },
       proteinIntake: parseFloat(proteinIntake),
-      notes,
     };
 
     const updatedRecords = [...records, newRecord].sort((a, b) =>
@@ -393,22 +408,40 @@ const MuscleGainTracker: React.FC = () => {
     }
   };
 
+  const chartLabels = Array.from(new Set(records.map(record => record.date).filter(Boolean)))
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+  const getSplitValue = (record: MuscleGainRecord, split: SplitKey) => {
+    if (split === 'push') return getStrength(record, 'benchPress');
+    if (split === 'pull') return getStrength(record, 'deadlift');
+    return getStrength(record, 'squat');
+  };
+
   const chartData = {
-    labels: records.map(record => record.date),
+    labels: chartLabels,
     datasets: [
       {
-        label: 'Bench Press (kg)',
-        data: records.map(record => getStrength(record, 'benchPress')),
+        label: 'Push',
+        data: chartLabels.map(date => {
+          const record = [...records].reverse().find(item => item.date === date && item.splitType === 'push');
+          return record ? getSplitValue(record, 'push') : null;
+        }),
         backgroundColor: '#FF6B6B',
       },
       {
-        label: 'Deadlift (kg)',
-        data: records.map(record => getStrength(record, 'deadlift')),
+        label: 'Pull',
+        data: chartLabels.map(date => {
+          const record = [...records].reverse().find(item => item.date === date && item.splitType === 'pull');
+          return record ? getSplitValue(record, 'pull') : null;
+        }),
         backgroundColor: '#4ECDC4',
       },
       {
-        label: 'Squat (kg)',
-        data: records.map(record => getStrength(record, 'squat')),
+        label: 'Legs',
+        data: chartLabels.map(date => {
+          const record = [...records].reverse().find(item => item.date === date && item.splitType === 'legs');
+          return record ? getSplitValue(record, 'legs') : null;
+        }),
         backgroundColor: '#45B7D1',
       },
     ],
@@ -447,15 +480,6 @@ const MuscleGainTracker: React.FC = () => {
 
       <IonContent className="ion-padding muscle-gain-content">
         <div className="tracker-shell">
-          <div className="tracker-hero">
-            <div>
-              <p className="hero-eyebrow">Workout log + PPL guide</p>
-              <h2>Track your lifts and follow a Push-Pull-Legs structure.</h2>
-              <p>Log your progress with a strength chart while using the PPL split for your next training focus.</p>
-            </div>
-            <div className="hero-badge">Hybrid layout</div>
-          </div>
-
           <IonGrid fixed>
             <IonRow>
               <IonCol size="12">
@@ -506,11 +530,6 @@ const MuscleGainTracker: React.FC = () => {
                     <IonLabel position="stacked">Daily Protein Intake (g)</IonLabel>
                     <IonInput type="number" value={proteinIntake} onIonChange={e => setProteinIntake(e.detail.value ?? '')} placeholder="180" />
                   </IonItem>
-                  <IonItem className="tracker-input">
-                    <IonLabel position="stacked">Notes</IonLabel>
-                    <IonInput value={notes} onIonChange={e => setNotes(e.detail.value ?? '')} placeholder={`How your ${activeSplit} session felt`} />
-                  </IonItem>
-
                   <div className="difficulty-buttons">
                     {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
                       <IonButton key={level} fill={difficulty === level ? 'solid' : 'outline'} onClick={() => setDifficulty(level)}>
@@ -533,7 +552,7 @@ const MuscleGainTracker: React.FC = () => {
                     {splitPlans[activeSplit].map(exercise => (
                       <div key={exercise.name} className="exercise-card">
                         <h3>{exercise.name}</h3>
-                        <p className="exercise-target">{exercise.target}</p>
+                        <p className="exercise-target">Targets: {exercise.target}</p>
                         <div className="exercise-meta">
                           <span>{exercise.sets}</span>
                           <span>{exercise.reps}</span>
