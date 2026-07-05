@@ -189,6 +189,10 @@
   margin-top: 4px;
 }
 
+.chart-segment-wrap {
+  margin-bottom: 12px;
+}
+
 .chart-container {
   height: 320px;
   position: relative;
