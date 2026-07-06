@@ -220,6 +220,11 @@
   overflow-x: auto;
 }
 
+.table-container table {
+  min-width: 860px;
+  table-layout: fixed;
+}
+
 .muscle-gain-content table {
   width: 100%;
   border-collapse: collapse;
@@ -231,10 +236,21 @@
   padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
 }
 
 .muscle-gain-content th {
   color: #67e8f9;
+  font-size: 0.84rem;
+}
+
+.muscle-gain-content th.metric-header,
+.muscle-gain-content td.metric-cell {
+  text-align: center;
+}
+
+.muscle-gain-content td.metric-cell {
+  font-variant-numeric: tabular-nums;
 }
 
 .records-list-wrap {

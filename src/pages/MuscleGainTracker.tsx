@@ -27,13 +27,12 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
   ChartOptions,
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import './MuscleGainTracker.css';
 import { API_CONFIG } from '../config/api.config';
 
@@ -44,14 +43,13 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend
 );
 
 type SplitKey = 'push' | 'pull' | 'legs';
-type RecordFilterSplit = 'all' | SplitKey;
+type RecordFilterSplit = SplitKey;
 type DifficultyKey = 'beginner' | 'intermediate' | 'advanced';
 
 interface ExerciseItem {
@@ -268,6 +266,21 @@ const getWorkoutValue = (record: any, key: string): number => {
   return toNumber(record?.workoutValues?.[key]);
 };
 
+const formatWorkoutValue = (value: number): string => {
+  if (!Number.isFinite(value)) return '0';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+};
+
+const compactHeaderLabel = (label: string): string => {
+  return label
+    .replace(' (kg)', '')
+    .replace('Romanian Deadlift', 'RDL')
+    .replace('Standing Calf Raise', 'Calf Raise')
+    .replace('Triceps Pushdown', 'Triceps')
+    .replace('Lateral Raise', 'Lateral')
+    .replace('Overhead Press', 'OHP');
+};
+
 const normalizeRecord = (record: any): MuscleGainRecord => {
   const splitType = (record?.splitType as SplitKey) || 'push';
   const fallbackValues = Object.fromEntries(
@@ -301,7 +314,7 @@ const MuscleGainTracker: React.FC = () => {
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [chartSplit, setChartSplit] = useState<SplitKey>('push');
-  const [recordsSplit, setRecordsSplit] = useState<RecordFilterSplit>('all');
+  const [recordsSplit, setRecordsSplit] = useState<RecordFilterSplit>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
 
   const loadRecords = async () => {
@@ -457,9 +470,8 @@ const MuscleGainTracker: React.FC = () => {
     .map(normalizeRecord)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const selectedRecordItems = recordsSplit === 'all'
-    ? displayRecords
-    : displayRecords.filter(record => record.splitType === recordsSplit);
+  const selectedRecordItems = displayRecords.filter(record => record.splitType === recordsSplit);
+  const selectedRecordFields = splitFieldConfig[recordsSplit].fields;
 
   const selectedChartRecords = displayRecords
     .filter(record => record.splitType === chartSplit)
@@ -471,18 +483,28 @@ const MuscleGainTracker: React.FC = () => {
   const chartData = {
     labels: chartLabels,
     datasets: splitFieldConfig[chartSplit].fields.map((field, index) => ({
-      label: field.label,
+      label: compactHeaderLabel(field.label),
       data: chartLabels.map(date => {
         const record = [...selectedChartRecords].reverse().find(item => item.date === date);
         return record ? getWorkoutValue(record, field.key) : null;
       }),
+      borderColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#F4A261', '#9B5DE5'][index % 5],
       backgroundColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#F4A261', '#9B5DE5'][index % 5],
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      borderWidth: 2,
+      tension: 0.28,
+      fill: false,
     })),
   };
 
-  const chartOptions: ChartOptions<'bar'> = {
+  const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     scales: {
       y: {
         beginAtZero: false,
@@ -496,7 +518,12 @@ const MuscleGainTracker: React.FC = () => {
     },
     plugins: {
       legend: { position: 'top', labels: { color: '#ffffff' } },
-      title: { display: true, text: 'Strength Progress', color: '#ffffff', font: { size: 16 } },
+      title: {
+        display: true,
+        text: `${splitFieldConfig[chartSplit].title} Progress` ,
+        color: '#ffffff',
+        font: { size: 16 },
+      },
     },
   };
 
@@ -619,7 +646,7 @@ const MuscleGainTracker: React.FC = () => {
                 </IonSegment>
               </div>
               <div className="chart-container">
-                <Bar data={chartData} options={chartOptions} />
+                <Line data={chartData} options={chartOptions} />
               </div>
             </div>
           )}
@@ -634,11 +661,8 @@ const MuscleGainTracker: React.FC = () => {
                 <div className="records-filter-wrap">
                   <IonSegment
                     value={recordsSplit}
-                    onIonChange={e => setRecordsSplit((e.detail.value as RecordFilterSplit) || 'all')}
+                    onIonChange={e => setRecordsSplit((e.detail.value as RecordFilterSplit) || 'push')}
                   >
-                    <IonSegmentButton value="all">
-                      <IonLabel>All</IonLabel>
-                    </IonSegmentButton>
                     <IonSegmentButton value="push">
                       <IonLabel>Push</IonLabel>
                     </IonSegmentButton>
@@ -655,7 +679,7 @@ const MuscleGainTracker: React.FC = () => {
               {selectedRecordItems.length === 0 && (
                 <div className="panel">
                   <p className="records-empty-state">
-                    No {recordsSplit === 'all' ? '' : `${recordsSplit} `}records yet.
+                    No {recordsSplit} records yet.
                   </p>
                 </div>
               )}
@@ -668,20 +692,22 @@ const MuscleGainTracker: React.FC = () => {
                         <thead>
                           <tr>
                             <th>Date</th>
-                            <th>Split</th>
-                            <th>Workouts</th>
+                            {selectedRecordFields.map((field) => (
+                              <th key={field.key} className="metric-header">
+                                {compactHeaderLabel(field.label)}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
                           {selectedRecordItems.map((record, index) => (
                             <tr key={index}>
                               <td>{record.date}</td>
-                              <td>{record.splitType}</td>
-                              <td>
-                                {splitFieldConfig[record.splitType].fields.map(field => (
-                                  `${field.label}: ${getWorkoutValue(record, field.key)} kg`
-                                )).join(' • ')}
-                              </td>
+                              {selectedRecordFields.map((field) => (
+                                <td key={field.key} className="metric-cell">
+                                  {formatWorkoutValue(getWorkoutValue(record, field.key))}
+                                </td>
+                              ))}
                             </tr>
                           ))}
                         </tbody>
@@ -697,10 +723,9 @@ const MuscleGainTracker: React.FC = () => {
                             <IonCard>
                               <IonCardContent>
                                 <div className="record-card-title">{record.date}</div>
-                                <div className="record-card-meta">Split: {record.splitType}</div>
                                 {splitFieldConfig[record.splitType].fields.map(field => (
                                   <div key={field.key} className="record-card-meta">
-                                    {field.label}: {getWorkoutValue(record, field.key)} kg
+                                    {compactHeaderLabel(field.label)}: {formatWorkoutValue(getWorkoutValue(record, field.key))}
                                   </div>
                                 ))}
                               </IonCardContent>
