@@ -193,6 +193,20 @@
   margin-bottom: 12px;
 }
 
+.records-filter-panel {
+  margin-top: 6px;
+}
+
+.records-filter-wrap {
+  margin-top: 6px;
+}
+
+.records-empty-state {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
 .chart-container {
   height: 320px;
   position: relative;

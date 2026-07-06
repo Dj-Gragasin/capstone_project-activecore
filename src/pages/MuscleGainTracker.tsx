@@ -51,6 +51,7 @@ ChartJS.register(
 );
 
 type SplitKey = 'push' | 'pull' | 'legs';
+type RecordFilterSplit = 'all' | SplitKey;
 type DifficultyKey = 'beginner' | 'intermediate' | 'advanced';
 
 interface ExerciseItem {
@@ -300,6 +301,7 @@ const MuscleGainTracker: React.FC = () => {
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [chartSplit, setChartSplit] = useState<SplitKey>('push');
+  const [recordsSplit, setRecordsSplit] = useState<RecordFilterSplit>('all');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
 
   const loadRecords = async () => {
@@ -451,7 +453,13 @@ const MuscleGainTracker: React.FC = () => {
     }
   };
 
-  const displayRecords = records.map(normalizeRecord);
+  const displayRecords = records
+    .map(normalizeRecord)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const selectedRecordItems = recordsSplit === 'all'
+    ? displayRecords
+    : displayRecords.filter(record => record.splitType === recordsSplit);
 
   const selectedChartRecords = displayRecords
     .filter(record => record.splitType === chartSplit)
@@ -586,7 +594,6 @@ const MuscleGainTracker: React.FC = () => {
                       </div>
                     ))}
                   </div>
-
                 </div>
               </IonCol>
             </IonRow>
@@ -619,54 +626,92 @@ const MuscleGainTracker: React.FC = () => {
 
           {displayRecords.length > 0 && (
             <>
-              <div className="records-table-wrap">
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Split</th>
-                        <th>Workouts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayRecords.map((record, index) => (
-                        <tr key={index}>
-                          <td>{record.date}</td>
-                          <td>{record.splitType}</td>
-                          <td>
-                            {splitFieldConfig[record.splitType].fields.map(field => (
-                              `${field.label}: ${getWorkoutValue(record, field.key)} kg`
-                            )).join(' • ')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="panel records-filter-panel">
+                <div className="section-title">
+                  <IonIcon icon={analytics} />
+                  <span>Record List Filter</span>
+                </div>
+                <div className="records-filter-wrap">
+                  <IonSegment
+                    value={recordsSplit}
+                    onIonChange={e => setRecordsSplit((e.detail.value as RecordFilterSplit) || 'all')}
+                  >
+                    <IonSegmentButton value="all">
+                      <IonLabel>All</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="push">
+                      <IonLabel>Push</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="pull">
+                      <IonLabel>Pull</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="legs">
+                      <IonLabel>Legs</IonLabel>
+                    </IonSegmentButton>
+                  </IonSegment>
                 </div>
               </div>
 
-              <div className="records-list-wrap">
-                <IonGrid>
-                  <IonRow>
-                    {displayRecords.map((record, index) => (
-                      <IonCol key={index} size="12" sizeMd="6">
-                        <IonCard>
-                          <IonCardContent>
-                            <div className="record-card-title">{record.date}</div>
-                            <div className="record-card-meta">Split: {record.splitType}</div>
-                            {splitFieldConfig[record.splitType].fields.map(field => (
-                              <div key={field.key} className="record-card-meta">
-                                {field.label}: {getWorkoutValue(record, field.key)} kg
-                              </div>
-                            ))}
-                          </IonCardContent>
-                        </IonCard>
-                      </IonCol>
-                    ))}
-                  </IonRow>
-                </IonGrid>
-              </div>
+              {selectedRecordItems.length === 0 && (
+                <div className="panel">
+                  <p className="records-empty-state">
+                    No {recordsSplit === 'all' ? '' : `${recordsSplit} `}records yet.
+                  </p>
+                </div>
+              )}
+
+              {selectedRecordItems.length > 0 && (
+                <>
+                  <div className="records-table-wrap">
+                    <div className="table-container">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Split</th>
+                            <th>Workouts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedRecordItems.map((record, index) => (
+                            <tr key={index}>
+                              <td>{record.date}</td>
+                              <td>{record.splitType}</td>
+                              <td>
+                                {splitFieldConfig[record.splitType].fields.map(field => (
+                                  `${field.label}: ${getWorkoutValue(record, field.key)} kg`
+                                )).join(' • ')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="records-list-wrap">
+                    <IonGrid>
+                      <IonRow>
+                        {selectedRecordItems.map((record, index) => (
+                          <IonCol key={index} size="12" sizeMd="6">
+                            <IonCard>
+                              <IonCardContent>
+                                <div className="record-card-title">{record.date}</div>
+                                <div className="record-card-meta">Split: {record.splitType}</div>
+                                {splitFieldConfig[record.splitType].fields.map(field => (
+                                  <div key={field.key} className="record-card-meta">
+                                    {field.label}: {getWorkoutValue(record, field.key)} kg
+                                  </div>
+                                ))}
+                              </IonCardContent>
+                            </IonCard>
+                          </IonCol>
+                        ))}
+                      </IonRow>
+                    </IonGrid>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
