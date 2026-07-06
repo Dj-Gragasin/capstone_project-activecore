@@ -305,6 +305,11 @@ const Home: React.FC = () => {
                   )}
                 </IonButton>
               </div>
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <IonButton fill="clear" onClick={() => { setShowLogin(false); router.push('/forgot-password'); }} disabled={isLoggingIn}>
+                  Forgot password?
+                </IonButton>
+              </div>
             </form>
           </IonContent>
         </IonModal>
