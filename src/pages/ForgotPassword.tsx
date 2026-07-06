@@ -46,9 +46,12 @@ const ForgotPassword: React.FC = () => {
         body: JSON.stringify({ email: normalizedEmail }),
       });
 
-      // Backend intentionally returns generic success message to avoid enumeration
       const data = await res.json().catch(() => ({}));
-      setToastMsg(data?.message || 'If an account exists, a reset email has been sent');
+      setToastMsg(data?.message || 'Reset link sent to your email');
+
+      if (!res.ok) {
+        return;
+      }
 
       // After sending, navigate back to home/login
       setTimeout(() => router.push('/home'), 1400);
@@ -97,10 +100,6 @@ const ForgotPassword: React.FC = () => {
                 <IonButton className="recovery-secondary-btn" fill="clear" onClick={() => router.push('/home')}>
                   Back to login
                 </IonButton>
-              </div>
-
-              <div className="recovery-note">
-                For security, we always show the same response even if the email is not registered.
               </div>
             </form>
           </div>
