@@ -47,7 +47,7 @@ import { API_CONFIG } from '../config/api.config';
 const API_URL = API_CONFIG.BASE_URL;
 
 type PaymentStatus = 'pending' | 'paid' | 'expired' | 'cancelled';
-type MemberStatusFilter = 'all' | 'active' | 'inactive';
+type MemberStatusFilter = 'all' | 'active' | 'inactive' | 'pending';
 
 interface Member {
   id?: number;
@@ -111,6 +111,9 @@ const MembersManagement: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Add this line
   const [presentToast] = useIonToast();
 
+  const getBackendStatusParam = (filter: MemberStatusFilter): string =>
+    filter === 'active' || filter === 'inactive' ? filter : '';
+
   const loadMembers = useCallback(async (opts?: { page?: number; perPage?: number; sortBy?: string; sortDir?: string; q?: string; status?: string }) => {
     setLoadingMembers(true);
     try {
@@ -119,7 +122,7 @@ const MembersManagement: React.FC = () => {
       const sb = opts?.sortBy ?? sortBy;
       const sd = opts?.sortDir ?? sortDir;
       const q = opts?.q ?? searchText;
-      const status = opts?.status ?? (memberStatusFilter === 'all' ? '' : memberStatusFilter);
+      const status = opts?.status ?? getBackendStatusParam(memberStatusFilter);
 
       const params = new URLSearchParams();
       params.append('page', String(p));
@@ -166,13 +169,14 @@ const MembersManagement: React.FC = () => {
 
   // Load members when relevant params change
   useEffect(() => {
-    loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
+    const backendStatus = getBackendStatusParam(memberStatusFilter);
+    loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
     const intervalId = window.setInterval(() => {
-      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
+      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
     }, 30000);
 
     const handleRefreshMembers = () => {
-      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
+      loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
     };
 
     window.addEventListener('focus', handleRefreshMembers);
@@ -191,11 +195,75 @@ const MembersManagement: React.FC = () => {
     if (searchDebounceTimer.current) clearTimeout(searchDebounceTimer.current);
     searchDebounceTimer.current = setTimeout(() => {
       setPage(1);
-      loadMembers({ page: 1, perPage, sortBy, sortDir, q: searchText, status: memberStatusFilter === 'all' ? '' : memberStatusFilter });
+      loadMembers({ page: 1, perPage, sortBy, sortDir, q: searchText, status: getBackendStatusParam(memberStatusFilter) });
     }, 300);
     return () => clearTimeout(searchDebounceTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
+
+  const normalizedSearchText = useMemo(() => searchText.trim().toLowerCase(), [searchText]);
+
+  const searchedMembers = useMemo(() => {
+    if (!normalizedSearchText) return members;
+
+    return members.filter((member) => {
+      const searchable = [
+        member.firstName,
+        member.lastName,
+        member.email,
+        member.phone,
+        member.membershipType,
+        member.status,
+        member.paymentStatus,
+      ]
+        .map((value) => String(value ?? '').toLowerCase())
+        .join(' ');
+
+      return searchable.includes(normalizedSearchText);
+    });
+  }, [members, normalizedSearchText]);
+
+  const memberStats = useMemo(() => {
+    const activeCount = searchedMembers.filter((m) => String(m.status || '').toLowerCase() === 'active').length;
+    const inactiveCount = searchedMembers.filter((m) => String(m.status || '').toLowerCase() !== 'active').length;
+    const pendingCount = searchedMembers.filter((m) => String(m.paymentStatus || 'pending').toLowerCase() === 'pending').length;
+
+    return {
+      total: searchedMembers.length,
+      active: activeCount,
+      inactive: inactiveCount,
+      pending: pendingCount,
+    };
+  }, [searchedMembers]);
+
+  const filteredMembers = useMemo(() => {
+    if (memberStatusFilter === 'active') {
+      return searchedMembers.filter((m) => String(m.status || '').toLowerCase() === 'active');
+    }
+
+    if (memberStatusFilter === 'inactive') {
+      return searchedMembers.filter((m) => String(m.status || '').toLowerCase() !== 'active');
+    }
+
+    if (memberStatusFilter === 'pending') {
+      return searchedMembers.filter((m) => String(m.paymentStatus || 'pending').toLowerCase() === 'pending');
+    }
+
+    return searchedMembers;
+  }, [searchedMembers, memberStatusFilter]);
+
+  const totalFilteredMembers = filteredMembers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredMembers / perPage));
+  const paginatedMembers = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredMembers.slice(start, start + perPage);
+  }, [filteredMembers, page, perPage]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleAddMember = () => {
     setIsEditing(false);
@@ -619,13 +687,19 @@ const MembersManagement: React.FC = () => {
       ? 'No Active Members Found'
       : memberStatusFilter === 'inactive'
         ? 'No Inactive Members Found'
+        : memberStatusFilter === 'pending'
+          ? 'No Members With Pending Payments'
         : 'No Members Found';
 
   const emptyStateDescription =
-    memberStatusFilter === 'active'
+    normalizedSearchText && filteredMembers.length === 0
+      ? 'No members match your search.'
+      : memberStatusFilter === 'active'
       ? 'There are currently no active members.'
       : memberStatusFilter === 'inactive'
         ? 'There are currently no inactive members.'
+        : memberStatusFilter === 'pending'
+          ? 'There are currently no members with pending payments.'
         : 'Add your first member to get started';
 
   return (
@@ -653,61 +727,88 @@ const MembersManagement: React.FC = () => {
               <IonCol size="12" sizeSm="6" sizeMd="3">
                 <div
                   className={`stat-card clickable ${memberStatusFilter === 'all' ? 'active-filter' : ''}`}
-                  onClick={() => setMemberStatusFilter('all')}
+                  onClick={() => {
+                    setMemberStatusFilter('all');
+                    setPage(1);
+                  }}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       setMemberStatusFilter('all');
+                      setPage(1);
                     }
                   }}
                 >
                   <IonIcon icon={person} />
-                  <h3>{members.length}</h3>
+                  <h3>{memberStats.total}</h3>
                   <p>Total Members</p>
                 </div>
               </IonCol>
               <IonCol size="12" sizeSm="6" sizeMd="3">
                 <div
                   className={`stat-card success clickable ${memberStatusFilter === 'active' ? 'active-filter' : ''}`}
-                  onClick={() => setMemberStatusFilter('active')}
+                  onClick={() => {
+                    setMemberStatusFilter('active');
+                    setPage(1);
+                  }}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       setMemberStatusFilter('active');
+                      setPage(1);
                     }
                   }}
                 >
                   <IonIcon icon={checkmark} />
-                  <h3>{members.filter((m) => m.status === 'active').length}</h3>
+                  <h3>{memberStats.active}</h3>
                   <p>Active Members</p>
                 </div>
               </IonCol>
               <IonCol size="12" sizeSm="6" sizeMd="3">
                 <div
                   className={`stat-card danger clickable ${memberStatusFilter === 'inactive' ? 'active-filter' : ''}`}
-                  onClick={() => setMemberStatusFilter('inactive')}
+                  onClick={() => {
+                    setMemberStatusFilter('inactive');
+                    setPage(1);
+                  }}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       setMemberStatusFilter('inactive');
+                      setPage(1);
                     }
                   }}
                 >
                   <IonIcon icon={close} />
-                  <h3>{members.filter((m) => m.status === 'inactive').length}</h3>
+                  <h3>{memberStats.inactive}</h3>
                   <p>Inactive Members</p>
                 </div>
               </IonCol>
               <IonCol size="12" sizeSm="6" sizeMd="3">
-                <div className="stat-card warning">
+                <div
+                  className={`stat-card warning clickable ${memberStatusFilter === 'pending' ? 'active-filter' : ''}`}
+                  onClick={() => {
+                    setMemberStatusFilter('pending');
+                    setPage(1);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setMemberStatusFilter('pending');
+                      setPage(1);
+                    }
+                  }}
+                >
                   <IonIcon icon={calendar} />
-                  <h3>{members.filter((m) => m.paymentStatus === 'pending').length}</h3>
+                  <h3>{memberStats.pending}</h3>
                   <p>Pending Payments</p>
                 </div>
               </IonCol>
@@ -730,7 +831,7 @@ const MembersManagement: React.FC = () => {
               <IonCol size="12">
                 {loadingMembers ? (
                   <div className="empty-state">Loading members...</div>
-                ) : members.length === 0 ? (
+                ) : filteredMembers.length === 0 ? (
                   <div className="empty-state">
                     <IonIcon icon={person} />
                     <h3>{emptyStateTitle}</h3>
@@ -752,7 +853,7 @@ const MembersManagement: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {members.map((member) => (
+                        {paginatedMembers.map((member) => (
                           <tr key={member.id} className="member-row">
                             <td>
                               <div className="name-cell">
@@ -822,8 +923,8 @@ const MembersManagement: React.FC = () => {
                     </table>
                     <div className="members-table-footer">
                       <div className="members-table-info">
-                        {totalMembers > 0 ? (
-                          <span>Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, totalMembers)} of {totalMembers}</span>
+                        {totalFilteredMembers > 0 ? (
+                          <span>Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, totalFilteredMembers)} of {totalFilteredMembers}</span>
                         ) : null}
                       </div>
                       <div className="members-table-controls">
@@ -837,7 +938,6 @@ const MembersManagement: React.FC = () => {
 
                         <div className="pagination">
                           {(() => {
-                            const totalPages = Math.max(1, Math.ceil(totalMembers / perPage));
                             const start = Math.max(1, page - 2);
                             const end = Math.min(totalPages, page + 2);
                             const pages = [] as number[];
