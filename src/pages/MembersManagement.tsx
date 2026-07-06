@@ -45,6 +45,8 @@ import './MembersManagement.css';
 import { API_CONFIG } from '../config/api.config';
 
 const API_URL = API_CONFIG.BASE_URL;
+const MEMBERS_AUTO_REFRESH_MS = 90000;
+const MEMBERS_SEARCH_DEBOUNCE_MS = 700;
 
 type PaymentStatus = 'pending' | 'paid' | 'expired' | 'cancelled';
 type MemberStatusFilter = 'all' | 'active' | 'inactive' | 'pending';
@@ -173,7 +175,7 @@ const MembersManagement: React.FC = () => {
     loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
     const intervalId = window.setInterval(() => {
       loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
-    }, 30000);
+    }, MEMBERS_AUTO_REFRESH_MS);
 
     const handleRefreshMembers = () => {
       loadMembers({ page, perPage, sortBy, sortDir, q: searchText, status: backendStatus });
@@ -196,7 +198,7 @@ const MembersManagement: React.FC = () => {
     searchDebounceTimer.current = setTimeout(() => {
       setPage(1);
       loadMembers({ page: 1, perPage, sortBy, sortDir, q: searchText, status: getBackendStatusParam(memberStatusFilter) });
-    }, 300);
+    }, MEMBERS_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(searchDebounceTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
