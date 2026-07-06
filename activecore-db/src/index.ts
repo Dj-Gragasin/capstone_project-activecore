@@ -1839,13 +1839,40 @@ async function ensureMuscleGainRecordsTable() {
         id SERIAL PRIMARY KEY,
         user_id INT NOT NULL,
         record_date DATE NOT NULL,
+        split_type VARCHAR(20) NOT NULL DEFAULT 'push',
         data JSONB NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (user_id, record_date)
+        UNIQUE (user_id, record_date, split_type)
       )
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_muscle_gain_user_date ON muscle_gain_records(user_id, record_date)`);
+
+    // Migrate existing schemas that only had (user_id, record_date) uniqueness.
+    await pool.query(`ALTER TABLE muscle_gain_records ADD COLUMN IF NOT EXISTS split_type VARCHAR(20)`);
+    await pool.query(`
+      UPDATE muscle_gain_records
+      SET split_type = COALESCE(NULLIF(split_type, ''), COALESCE(data->>'splitType', 'push'))
+      WHERE split_type IS NULL OR split_type = ''
+    `);
+    await pool.query(`ALTER TABLE muscle_gain_records ALTER COLUMN split_type SET DEFAULT 'push'`);
+    await pool.query(`ALTER TABLE muscle_gain_records ALTER COLUMN split_type SET NOT NULL`);
+    await pool.query(`ALTER TABLE muscle_gain_records DROP CONSTRAINT IF EXISTS muscle_gain_records_user_id_record_date_key`);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'muscle_gain_records_user_date_split_key'
+        ) THEN
+          ALTER TABLE muscle_gain_records
+          ADD CONSTRAINT muscle_gain_records_user_date_split_key
+          UNIQUE (user_id, record_date, split_type);
+        END IF;
+      END$$;
+    `);
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_muscle_gain_user_date_split ON muscle_gain_records(user_id, record_date, split_type)`);
     return;
   } catch (err: any) {
     // fall through
@@ -1858,13 +1885,35 @@ async function ensureMuscleGainRecordsTable() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         record_date DATE NOT NULL,
+        split_type VARCHAR(20) NOT NULL DEFAULT 'push',
         data JSON NOT NULL,
         created_at DATETIME NOT NULL DEFAULT NOW(),
         updated_at DATETIME NOT NULL DEFAULT NOW(),
-        UNIQUE KEY uniq_muscle_gain_user_date (user_id, record_date),
-        INDEX idx_muscle_gain_user_date (user_id, record_date)
+        UNIQUE KEY uniq_muscle_gain_user_date_split (user_id, record_date, split_type),
+        INDEX idx_muscle_gain_user_date_split (user_id, record_date, split_type)
       )
     `);
+
+    // Best-effort migration for existing local MySQL schemas.
+    try {
+      await pool.query(`ALTER TABLE muscle_gain_records ADD COLUMN IF NOT EXISTS split_type VARCHAR(20) NOT NULL DEFAULT 'push'`);
+      await pool.query(`UPDATE muscle_gain_records SET split_type = COALESCE(NULLIF(split_type, ''), 'push') WHERE split_type IS NULL OR split_type = ''`);
+      await pool.query(`ALTER TABLE muscle_gain_records DROP INDEX uniq_muscle_gain_user_date`);
+    } catch {
+      // no-op
+    }
+
+    try {
+      await pool.query(`ALTER TABLE muscle_gain_records ADD UNIQUE KEY uniq_muscle_gain_user_date_split (user_id, record_date, split_type)`);
+    } catch {
+      // no-op
+    }
+
+    try {
+      await pool.query(`CREATE INDEX idx_muscle_gain_user_date_split ON muscle_gain_records(user_id, record_date, split_type)`);
+    } catch {
+      // no-op
+    }
   } catch (err: any) {
     logWarn('Failed to ensure muscle_gain_records table', err?.message || String(err));
   }
@@ -4293,49 +4342,9 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
 // ===== MEMBER MANAGEMENT ROUTES =====
 app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const pageParam = String(req.query.page || '1');
-    const perPageParam = String(req.query.perPage || '25');
-    const q = String(req.query.q || '').trim();
-    const statusFilter = String(req.query.status || '').toLowerCase().trim();
-    const sortBy = String(req.query.sortBy || 'lastName').trim();
-    const sortDir = String(req.query.sortDir || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-
-    const page = Math.max(1, Number.isInteger(Number(pageParam)) ? Number(pageParam) : 1);
-    const perPage = Math.min(100, Math.max(1, Number.isInteger(Number(perPageParam)) ? Number(perPageParam) : 25));
-    const offset = (page - 1) * perPage;
-
-    const sortMap: Record<string, string> = {
-      firstName: 'u.first_name',
-      lastName: 'u.last_name',
-      email: 'u.email',
-      phone: 'u.phone',
-      membershipPrice: 'u.membership_price',
-      status: 'u.status',
-      paymentStatus: 'u.payment_status',
-      joinDate: 'u.join_date',
-    };
-    const orderBy = sortMap[sortBy] || 'u.last_name';
-
-    const whereClauses = ['u.role = ?'];
-    const queryParams: any[] = ['member'];
-
-    if (statusFilter === 'active' || statusFilter === 'inactive') {
-      whereClauses.push('u.status = ?');
-      queryParams.push(statusFilter);
-    }
-
-    if (q) {
-      whereClauses.push(
-        `(LOWER(u.first_name) LIKE ? OR LOWER(u.last_name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(u.phone) LIKE ?)`
-      );
-      const searchValue = `%${q.toLowerCase()}%`;
-      queryParams.push(searchValue, searchValue, searchValue, searchValue);
-    }
-
-    const countQuery = `SELECT COUNT(*) AS total FROM users u WHERE ${whereClauses.join(' AND ')}`;
-    const [countRows] = await pool.query<any>(countQuery, queryParams);
-    const total = Number(countRows?.[0]?.total ?? 0);
-
+    
+    // PostgreSQL-safe: avoid GROUP BY across many selected columns.
+    // Use a correlated subquery for payment count instead.
     const [members] = await pool.query<any>(
       `SELECT
         u.id,
@@ -4396,12 +4405,10 @@ app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
         ) as "latestPaidSubscriptionEnd",
         (SELECT COUNT(*) FROM payments p WHERE p.user_id = u.id) as "totalPayments"
       FROM users u
-      WHERE ${whereClauses.join(' AND ')}
-      ORDER BY ${orderBy} ${sortDir}
-      LIMIT ? OFFSET ?`,
-      [...queryParams, perPage, offset]
+      WHERE u.role = 'member'`
     );
 
+    
     const normalizeMemberStatus = (raw: any): 'active' | 'inactive' => {
       const s = String(raw ?? '').toLowerCase().trim();
       return s === 'active' ? 'active' : 'inactive';
@@ -4445,7 +4452,7 @@ app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
       };
     });
 
-    res.json({ data: transformedMembers, total, page, perPage });
+    res.json(transformedMembers);
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: getErrorMessage(error) });
   }
@@ -7118,7 +7125,7 @@ app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, 
   try {
     const userId = req.user!.id;
     const [rows] = await pool.query<any>(
-      'SELECT record_date, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC',
+      'SELECT record_date, split_type, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC, updated_at ASC',
       [userId]
     );
 
@@ -7132,8 +7139,11 @@ app.get('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest, 
         try { data = JSON.parse(data); } catch { data = {}; }
       }
 
+      const rawSplit = String(r.split_type || data?.splitType || 'push').toLowerCase();
+      const normalizedSplit = rawSplit === 'pull' || rawSplit === 'legs' ? rawSplit : 'push';
+
       // Always return with a canonical `date` field.
-      return { date: recordDate, ...(data || {}) };
+      return { date: recordDate, ...(data || {}), splitType: normalizedSplit };
     });
 
     res.json({ success: true, records });
@@ -7146,8 +7156,7 @@ app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest,
   try {
     const userId = req.user!.id;
     const { date, splitType, workoutValues, measurements, strengthStats, proteinIntake, notes } = req.body || {};
-
-    const hasNewPayload = Boolean(date && splitType && workoutValues && typeof workoutValues === 'object');
+    const hasNewPayload = Boolean(date && workoutValues && typeof workoutValues === 'object');
     const hasLegacyPayload = Boolean(date && measurements && strengthStats && proteinIntake !== undefined && proteinIntake !== null);
 
     if (!date || (!hasNewPayload && !hasLegacyPayload)) {
@@ -7155,16 +7164,20 @@ app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest,
     }
 
     const recordDate = String(date).slice(0, 10);
+    const rawSplit = String(splitType || '').trim().toLowerCase();
+    const normalizedSplit = rawSplit === 'pull' || rawSplit === 'legs' ? rawSplit : 'push';
+
     const payload = hasNewPayload
       ? {
           date: recordDate,
-          splitType,
+          splitType: normalizedSplit,
           workoutValues: Object.fromEntries(
             Object.entries(workoutValues || {}).map(([key, value]) => [key, Number(value)])
           ),
         }
       : {
           date: recordDate,
+          splitType: normalizedSplit,
           measurements,
           strengthStats,
           proteinIntake: Number(proteinIntake),
@@ -7174,25 +7187,25 @@ app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest,
     // Prefer PostgreSQL upsert.
     try {
       await pool.query(
-        `INSERT INTO muscle_gain_records (user_id, record_date, data, created_at, updated_at)
-         VALUES (?, ?, ?::jsonb, NOW(), NOW())
-         ON CONFLICT (user_id, record_date)
+        `INSERT INTO muscle_gain_records (user_id, record_date, split_type, data, created_at, updated_at)
+         VALUES (?, ?, ?, ?::jsonb, NOW(), NOW())
+         ON CONFLICT (user_id, record_date, split_type)
          DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
-        [userId, recordDate, JSON.stringify(payload)]
+        [userId, recordDate, normalizedSplit, JSON.stringify(payload)]
       );
     } catch (e: any) {
       // MySQL fallback.
       await pool.query(
-        `INSERT INTO muscle_gain_records (user_id, record_date, data, created_at, updated_at)
-         VALUES (?, ?, ?, NOW(), NOW())
+        `INSERT INTO muscle_gain_records (user_id, record_date, split_type, data, created_at, updated_at)
+         VALUES (?, ?, ?, ?, NOW(), NOW())
          ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = NOW()`,
-        [userId, recordDate, JSON.stringify(payload)]
+        [userId, recordDate, normalizedSplit, JSON.stringify(payload)]
       );
     }
 
     // Return the updated list for the chart.
     const [rows] = await pool.query<any>(
-      'SELECT record_date, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC',
+      'SELECT record_date, split_type, data FROM muscle_gain_records WHERE user_id = ? ORDER BY record_date ASC, updated_at ASC',
       [userId]
     );
     const records = (rows || []).map((r: any) => {
@@ -7201,7 +7214,10 @@ app.post('/api/muscle-gain/records', authenticateToken, async (req: AuthRequest,
       if (typeof data === 'string') {
         try { data = JSON.parse(data); } catch { data = {}; }
       }
-      return { date: d, ...(data || {}) };
+
+      const itemSplit = String(r.split_type || data?.splitType || 'push').toLowerCase();
+      const normalizedItemSplit = itemSplit === 'pull' || itemSplit === 'legs' ? itemSplit : 'push';
+      return { date: d, ...(data || {}), splitType: normalizedItemSplit };
     });
 
     res.json({ success: true, records });
