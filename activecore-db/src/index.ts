@@ -4258,9 +4258,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       [normalizedEmail]
     );
 
-    // Always respond with a generic message to avoid account enumeration.
+    // Product requirement: only allow existing accounts to request reset.
     if (!Array.isArray(users) || users.length === 0) {
-      return res.json({ message: 'If an account exists, a reset email has been sent' });
+      return res.status(404).json({ message: 'No account found for this email address' });
     }
 
     const user = users[0];
@@ -4301,7 +4301,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       logError('Failed to send forgot-password email', err);
     }
 
-    return res.json({ message: 'If an account exists, a reset email has been sent' });
+    return res.json({ message: 'Reset link sent to your email' });
   } catch (error: any) {
     logError('Forgot password failed', error);
     return res.status(500).json({ message: 'Server error' });
