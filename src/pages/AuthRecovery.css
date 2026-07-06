@@ -1,0 +1,193 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Manrope:wght@500;600;700&display=swap');
+
+:root {
+  --recovery-bg-a: #081317;
+  --recovery-bg-b: #0d1f26;
+  --recovery-accent: #31e8a6;
+  --recovery-accent-strong: #14cc8a;
+  --recovery-surface: rgba(11, 25, 31, 0.88);
+  --recovery-surface-border: rgba(49, 232, 166, 0.22);
+  --recovery-text: #eef8f4;
+  --recovery-muted: #a9c2b7;
+}
+
+.recovery-content {
+  --background:
+    radial-gradient(1200px 450px at -10% -20%, rgba(49, 232, 166, 0.22), transparent 60%),
+    radial-gradient(800px 300px at 110% 20%, rgba(42, 176, 255, 0.16), transparent 65%),
+    linear-gradient(155deg, var(--recovery-bg-a) 0%, var(--recovery-bg-b) 72%);
+  color: var(--recovery-text);
+}
+
+.recovery-shell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px 14px;
+}
+
+.recovery-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--recovery-surface);
+  border: 1px solid var(--recovery-surface-border);
+  border-radius: 22px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+  padding: 22px;
+  backdrop-filter: blur(8px);
+  animation: recovery-fade-up 360ms ease-out;
+}
+
+.recovery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: #04140e;
+  background: linear-gradient(135deg, #31e8a6 0%, #78f7cc 100%);
+  border-radius: 999px;
+  padding: 7px 12px;
+}
+
+.recovery-title {
+  margin: 12px 0 8px;
+  font-family: 'Sora', sans-serif;
+  font-size: clamp(1.45rem, 2.8vw, 1.75rem);
+  line-height: 1.2;
+  color: var(--recovery-text);
+}
+
+.recovery-subtitle {
+  margin: 0 0 16px;
+  color: var(--recovery-muted);
+  line-height: 1.48;
+  font-size: 0.95rem;
+}
+
+.recovery-form ion-item {
+  --background: rgba(9, 20, 24, 0.9);
+  --border-color: rgba(169, 194, 183, 0.28);
+  --border-radius: 14px;
+  --highlight-color-focused: var(--recovery-accent);
+  margin-bottom: 12px;
+  border-radius: 14px;
+}
+
+.recovery-form ion-label {
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: 0.01em;
+  color: #d4e6df;
+}
+
+.recovery-form ion-input {
+  --color: #f4f9f7;
+  --placeholder-color: #83a195;
+  font-family: 'Manrope', sans-serif;
+}
+
+.recovery-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.recovery-primary-btn {
+  --background: linear-gradient(135deg, var(--recovery-accent) 0%, var(--recovery-accent-strong) 100%);
+  --background-hover: linear-gradient(135deg, #43efb2 0%, #17d596 100%);
+  --color: #032315;
+  --border-radius: 12px;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  min-height: 44px;
+  text-transform: none;
+}
+
+.recovery-secondary-btn {
+  --color: #c3d8d0;
+  --border-radius: 12px;
+  text-transform: none;
+  font-family: 'Manrope', sans-serif;
+}
+
+.recovery-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(49, 232, 166, 0.28);
+  border-radius: 12px;
+  color: #b9d6cb;
+  font-size: 0.85rem;
+}
+
+.recovery-token-warning {
+  margin: 0 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 200, 88, 0.35);
+  background: rgba(90, 64, 20, 0.23);
+  padding: 10px 12px;
+  color: #ffe2a2;
+  font-size: 0.9rem;
+}
+
+.recovery-strength {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #b6d4c8;
+  font-size: 0.82rem;
+  margin: 3px 2px 11px;
+}
+
+.recovery-strength-pill {
+  border-radius: 999px;
+  padding: 3px 10px;
+  border: 1px solid rgba(169, 194, 183, 0.34);
+  color: #d6e7e0;
+}
+
+.recovery-strength-pill.weak {
+  border-color: rgba(255, 116, 116, 0.56);
+  color: #ffd0d0;
+}
+
+.recovery-strength-pill.medium {
+  border-color: rgba(255, 212, 122, 0.6);
+  color: #ffe4af;
+}
+
+.recovery-strength-pill.strong {
+  border-color: rgba(102, 255, 194, 0.66);
+  color: #c7ffe8;
+}
+
+.recovery-tips {
+  margin: 0;
+  padding-left: 16px;
+  color: #a6c2b8;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@keyframes recovery-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .recovery-card {
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .recovery-shell {
+    padding: 14px 10px;
+  }
+}
