@@ -134,10 +134,24 @@ const MembersManagement: React.FC = () => {
       });
       if (res.ok) {
         const json = await res.json();
-        setMembers(json.data || []);
-        setTotalMembers(Number(json.total || 0));
-        setPage(Number(json.page || p));
-        setPerPage(Number(json.perPage || pp));
+
+        // Support both payload styles:
+        // 1) array response: [member, member, ...]
+        // 2) paginated object: { data: [...], total, page, perPage }
+        const memberList = Array.isArray(json)
+          ? json
+          : Array.isArray(json?.data)
+            ? json.data
+            : [];
+
+        const total = Array.isArray(json)
+          ? memberList.length
+          : Number(json?.total ?? memberList.length);
+
+        setMembers(memberList);
+        setTotalMembers(total);
+        setPage(Array.isArray(json) ? p : Number(json?.page || p));
+        setPerPage(Array.isArray(json) ? pp : Number(json?.perPage || pp));
       } else {
         const err = await res.json().catch(() => ({}));
         presentToast({ message: err.message || 'Failed to load members', duration: 2000, color: 'danger' });
