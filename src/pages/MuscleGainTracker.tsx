@@ -312,7 +312,6 @@ const MuscleGainTracker: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
-  const [viewSplit, setViewSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
 
   const loadRecords = async () => {
@@ -468,11 +467,11 @@ const MuscleGainTracker: React.FC = () => {
     .map(normalizeRecord)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const selectedRecordItems = displayRecords.filter(record => record.splitType === viewSplit);
-  const selectedRecordFields = splitFieldConfig[viewSplit].fields;
+  const selectedRecordItems = displayRecords.filter(record => record.splitType === activeSplit);
+  const selectedRecordFields = splitFieldConfig[activeSplit].fields;
 
   const selectedChartRecords = displayRecords
-    .filter(record => record.splitType === viewSplit)
+    .filter(record => record.splitType === activeSplit)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const chartLabels = Array.from(new Set(selectedChartRecords.map(record => record.date).filter(Boolean)))
@@ -480,7 +479,7 @@ const MuscleGainTracker: React.FC = () => {
 
   const chartData = {
     labels: chartLabels,
-    datasets: splitFieldConfig[viewSplit].fields.map((field, index) => ({
+    datasets: splitFieldConfig[activeSplit].fields.map((field, index) => ({
       label: compactHeaderLabel(field.label),
       data: chartLabels.map(date => {
         const record = [...selectedChartRecords].reverse().find(item => item.date === date);
@@ -518,7 +517,7 @@ const MuscleGainTracker: React.FC = () => {
       legend: { position: 'top', labels: { color: '#ffffff' } },
       title: {
         display: true,
-        text: `${splitFieldConfig[viewSplit].title} Progress` ,
+        text: `${splitFieldConfig[activeSplit].title} Progress` ,
         color: '#ffffff',
         font: { size: 16 },
       },
@@ -587,38 +586,6 @@ const MuscleGainTracker: React.FC = () => {
                     <IonButton expand="block" onClick={handleUpdate}>Save Entry</IonButton>
                     <IonButton expand="block" fill="outline" color="danger" onClick={handleDeleteAll}>Delete All</IonButton>
                   </div>
-
-                  <div className="difficulty-buttons">
-                    {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
-                      <IonButton key={level} fill={difficulty === level ? 'solid' : 'outline'} onClick={() => setDifficulty(level)}>
-                        {difficultyProfiles[level].title}
-                      </IonButton>
-                    ))}
-                  </div>
-
-                  <div className="difficulty-panel">
-                    <h3>{difficultyProfiles[difficulty].title}</h3>
-                    <ul>
-                      <li><strong>Frequency:</strong> {difficultyProfiles[difficulty].days}</li>
-                      <li><strong>Volume:</strong> {difficultyProfiles[difficulty].sets}</li>
-                      <li><strong>Load:</strong> {difficultyProfiles[difficulty].load}</li>
-                      <li><strong>Focus:</strong> {difficultyProfiles[difficulty].focus}</li>
-                    </ul>
-                  </div>
-
-                  <div className="exercise-grid">
-                    {splitPlans[activeSplit].map(exercise => (
-                      <div key={exercise.name} className="exercise-card">
-                        <h3>{exercise.name}</h3>
-                        <p className="exercise-target">Targets: {exercise.target}</p>
-                        <div className="exercise-meta">
-                          <span>{exercise.sets}</span>
-                          <span>{exercise.reps}</span>
-                        </div>
-                        <p className="exercise-description">{exercise.description}</p>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </IonCol>
             </IonRow>
@@ -629,19 +596,6 @@ const MuscleGainTracker: React.FC = () => {
               <div className="section-title">
                 <IonIcon icon={analytics} />
                 <span>Progress Graph</span>
-              </div>
-              <div className="chart-segment-wrap">
-                <IonSegment value={viewSplit} onIonChange={e => setViewSplit(e.detail.value as SplitKey)}>
-                  <IonSegmentButton value="push">
-                    <IonLabel>Push</IonLabel>
-                  </IonSegmentButton>
-                  <IonSegmentButton value="pull">
-                    <IonLabel>Pull</IonLabel>
-                  </IonSegmentButton>
-                  <IonSegmentButton value="legs">
-                    <IonLabel>Legs</IonLabel>
-                  </IonSegmentButton>
-                </IonSegment>
               </div>
               <div className="chart-container">
                 <Line data={chartData} options={chartOptions} />
@@ -654,7 +608,7 @@ const MuscleGainTracker: React.FC = () => {
               {selectedRecordItems.length === 0 && (
                 <div className="panel">
                   <p className="records-empty-state">
-                    No {viewSplit} records yet.
+                    No {activeSplit} records yet.
                   </p>
                 </div>
               )}
@@ -714,6 +668,45 @@ const MuscleGainTracker: React.FC = () => {
               )}
             </>
           )}
+
+          <div className="panel">
+            <div className="section-title">
+              <IonIcon icon={barbell} />
+              <span>Training Guidance</span>
+            </div>
+
+            <div className="difficulty-buttons">
+              {(['beginner', 'intermediate', 'advanced'] as DifficultyKey[]).map(level => (
+                <IonButton key={level} fill={difficulty === level ? 'solid' : 'outline'} onClick={() => setDifficulty(level)}>
+                  {difficultyProfiles[level].title}
+                </IonButton>
+              ))}
+            </div>
+
+            <div className="difficulty-panel">
+              <h3>{difficultyProfiles[difficulty].title}</h3>
+              <ul>
+                <li><strong>Frequency:</strong> {difficultyProfiles[difficulty].days}</li>
+                <li><strong>Volume:</strong> {difficultyProfiles[difficulty].sets}</li>
+                <li><strong>Load:</strong> {difficultyProfiles[difficulty].load}</li>
+                <li><strong>Focus:</strong> {difficultyProfiles[difficulty].focus}</li>
+              </ul>
+            </div>
+
+            <div className="exercise-grid">
+              {splitPlans[activeSplit].map(exercise => (
+                <div key={exercise.name} className="exercise-card">
+                  <h3>{exercise.name}</h3>
+                  <p className="exercise-target">Targets: {exercise.target}</p>
+                  <div className="exercise-meta">
+                    <span>{exercise.sets}</span>
+                    <span>{exercise.reps}</span>
+                  </div>
+                  <p className="exercise-description">{exercise.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </IonContent>
     </IonPage>
