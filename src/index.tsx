@@ -20,6 +20,7 @@ import "@ionic/react/css/display.css";
 
 /* ✅ Your custom theme */
 import "./theme/variables.css";
+import "./theme/unified-ui.css";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);

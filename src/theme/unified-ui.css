@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Sora:wght@500;600;700&display=swap');
+
+:root {
+  --app-bg-a: #081317;
+  --app-bg-b: #0d1f26;
+  --app-surface: rgba(11, 25, 31, 0.9);
+  --app-surface-soft: rgba(14, 30, 37, 0.82);
+  --app-surface-border: rgba(49, 232, 166, 0.16);
+  --app-text: #eef8f4;
+  --app-muted: #a9c2b7;
+  --app-accent: #31e8a6;
+  --app-accent-strong: #14cc8a;
+  --app-accent-cool: #46b1f5;
+
+  --ion-background-color: var(--app-bg-a);
+  --ion-text-color: var(--app-text);
+  --ion-color-primary: #31e8a6;
+  --ion-color-primary-rgb: 49, 232, 166;
+  --ion-color-primary-contrast: #032315;
+}
+
+html,
+body,
+ion-app {
+  min-height: 100%;
+  background:
+    radial-gradient(1100px 400px at -10% -20%, rgba(49, 232, 166, 0.2), transparent 60%),
+    radial-gradient(900px 340px at 110% 10%, rgba(42, 176, 255, 0.14), transparent 62%),
+    linear-gradient(160deg, var(--app-bg-a) 0%, var(--app-bg-b) 74%);
+  color: var(--app-text);
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+}
+
+ion-content {
+  --background: transparent;
+  --color: var(--app-text);
+}
+
+ion-toolbar {
+  --background: rgba(8, 20, 25, 0.9);
+  --color: var(--app-text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+ion-title {
+  font-family: 'Sora', 'Segoe UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Sora', 'Segoe UI', sans-serif;
+  color: var(--app-text);
+}
+
+p,
+span,
+label,
+li {
+  color: inherit;
+}
+
+ion-card {
+  --background: var(--app-surface);
+  background: var(--app-surface);
+  border: 1px solid var(--app-surface-border);
+  border-radius: 16px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+ion-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.32);
+}
+
+ion-item {
+  --background: var(--app-surface-soft);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --color: var(--app-text);
+  --highlight-color-focused: var(--app-accent);
+  border-radius: 12px;
+}
+
+ion-input,
+ion-select,
+ion-textarea {
+  --color: var(--app-text);
+  --placeholder-color: #85a39a;
+}
+
+ion-button {
+  --border-radius: 12px;
+  text-transform: none;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  font-weight: 700;
+}
+
+ion-button:not([fill='outline']):not([fill='clear']) {
+  --background: linear-gradient(135deg, var(--app-accent) 0%, var(--app-accent-strong) 100%);
+  --background-hover: linear-gradient(135deg, #43efb2 0%, #1ad999 100%);
+  --color: #032315;
+}
+
+ion-button[fill='outline'] {
+  --border-color: rgba(49, 232, 166, 0.5);
+  --color: #b7e9d8;
+}
+
+ion-segment {
+  background: rgba(8, 20, 25, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 2px;
+}
+
+ion-segment-button {
+  --color: #c8ded5;
+  --color-checked: #062519;
+  --indicator-color: transparent;
+  min-height: 34px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+ion-segment-button.segment-button-checked {
+  background: linear-gradient(135deg, var(--app-accent) 0%, var(--app-accent-cool) 100%);
+}
+
+ion-list,
+ion-grid,
+ion-col,
+ion-row {
+  color: var(--app-text);
+}
