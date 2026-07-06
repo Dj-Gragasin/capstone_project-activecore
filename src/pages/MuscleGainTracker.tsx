@@ -49,7 +49,6 @@ ChartJS.register(
 );
 
 type SplitKey = 'push' | 'pull' | 'legs';
-type RecordFilterSplit = SplitKey;
 type DifficultyKey = 'beginner' | 'intermediate' | 'advanced';
 
 interface ExerciseItem {
@@ -313,8 +312,7 @@ const MuscleGainTracker: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
-  const [chartSplit, setChartSplit] = useState<SplitKey>('push');
-  const [recordsSplit, setRecordsSplit] = useState<RecordFilterSplit>('push');
+  const [viewSplit, setViewSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
 
   const loadRecords = async () => {
@@ -470,11 +468,11 @@ const MuscleGainTracker: React.FC = () => {
     .map(normalizeRecord)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const selectedRecordItems = displayRecords.filter(record => record.splitType === recordsSplit);
-  const selectedRecordFields = splitFieldConfig[recordsSplit].fields;
+  const selectedRecordItems = displayRecords.filter(record => record.splitType === viewSplit);
+  const selectedRecordFields = splitFieldConfig[viewSplit].fields;
 
   const selectedChartRecords = displayRecords
-    .filter(record => record.splitType === chartSplit)
+    .filter(record => record.splitType === viewSplit)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const chartLabels = Array.from(new Set(selectedChartRecords.map(record => record.date).filter(Boolean)))
@@ -482,7 +480,7 @@ const MuscleGainTracker: React.FC = () => {
 
   const chartData = {
     labels: chartLabels,
-    datasets: splitFieldConfig[chartSplit].fields.map((field, index) => ({
+    datasets: splitFieldConfig[viewSplit].fields.map((field, index) => ({
       label: compactHeaderLabel(field.label),
       data: chartLabels.map(date => {
         const record = [...selectedChartRecords].reverse().find(item => item.date === date);
@@ -520,7 +518,7 @@ const MuscleGainTracker: React.FC = () => {
       legend: { position: 'top', labels: { color: '#ffffff' } },
       title: {
         display: true,
-        text: `${splitFieldConfig[chartSplit].title} Progress` ,
+        text: `${splitFieldConfig[viewSplit].title} Progress` ,
         color: '#ffffff',
         font: { size: 16 },
       },
@@ -630,10 +628,10 @@ const MuscleGainTracker: React.FC = () => {
             <div className="panel chart-panel">
               <div className="section-title">
                 <IonIcon icon={analytics} />
-                <span>Progress Chart</span>
+                <span>Progress Graph</span>
               </div>
               <div className="chart-segment-wrap">
-                <IonSegment value={chartSplit} onIonChange={e => setChartSplit(e.detail.value as SplitKey)}>
+                <IonSegment value={viewSplit} onIonChange={e => setViewSplit(e.detail.value as SplitKey)}>
                   <IonSegmentButton value="push">
                     <IonLabel>Push</IonLabel>
                   </IonSegmentButton>
@@ -653,33 +651,10 @@ const MuscleGainTracker: React.FC = () => {
 
           {displayRecords.length > 0 && (
             <>
-              <div className="panel records-filter-panel">
-                <div className="section-title">
-                  <IonIcon icon={analytics} />
-                  <span>Record List Filter</span>
-                </div>
-                <div className="records-filter-wrap">
-                  <IonSegment
-                    value={recordsSplit}
-                    onIonChange={e => setRecordsSplit((e.detail.value as RecordFilterSplit) || 'push')}
-                  >
-                    <IonSegmentButton value="push">
-                      <IonLabel>Push</IonLabel>
-                    </IonSegmentButton>
-                    <IonSegmentButton value="pull">
-                      <IonLabel>Pull</IonLabel>
-                    </IonSegmentButton>
-                    <IonSegmentButton value="legs">
-                      <IonLabel>Legs</IonLabel>
-                    </IonSegmentButton>
-                  </IonSegment>
-                </div>
-              </div>
-
               {selectedRecordItems.length === 0 && (
                 <div className="panel">
                   <p className="records-empty-state">
-                    No {recordsSplit} records yet.
+                    No {viewSplit} records yet.
                   </p>
                 </div>
               )}
@@ -723,7 +698,7 @@ const MuscleGainTracker: React.FC = () => {
                             <IonCard>
                               <IonCardContent>
                                 <div className="record-card-title">{record.date}</div>
-                                {splitFieldConfig[record.splitType].fields.map(field => (
+                                {selectedRecordFields.map(field => (
                                   <div key={field.key} className="record-card-meta">
                                     {compactHeaderLabel(field.label)}: {formatWorkoutValue(getWorkoutValue(record, field.key))}
                                   </div>
