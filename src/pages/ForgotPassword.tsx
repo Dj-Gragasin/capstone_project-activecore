@@ -14,6 +14,10 @@ import { keyOutline, mailOutline } from 'ionicons/icons';
 import { API_CONFIG } from '../config/api.config';
 import './AuthRecovery.css';
 
+const isValidEmailFormat = (value: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+};
+
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,8 +26,15 @@ const ForgotPassword: React.FC = () => {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!email) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
       setToastMsg('Please enter your email');
+      return;
+    }
+
+    if (!isValidEmailFormat(normalizedEmail)) {
+      setToastMsg('Please enter a valid email address');
       return;
     }
 
@@ -32,7 +43,7 @@ const ForgotPassword: React.FC = () => {
       const res = await fetch(`${API_CONFIG.BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
 
       // Backend intentionally returns generic success message to avoid enumeration
