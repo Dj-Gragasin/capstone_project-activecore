@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
   IonItem,
   IonLabel,
@@ -11,8 +8,11 @@ import {
   IonButton,
   IonToast,
   useIonRouter,
+  IonIcon,
 } from '@ionic/react';
+import { keyOutline, mailOutline } from 'ionicons/icons';
 import { API_CONFIG } from '../config/api.config';
+import './AuthRecovery.css';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -51,36 +51,49 @@ const ForgotPassword: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Forgot Password</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <form onSubmit={handleSubmit}>
-          <p>Enter the email address for your account. We'll send a link to reset your password.</p>
+      <IonContent className="recovery-content" fullscreen>
+        <div className="recovery-shell">
+          <div className="recovery-card">
+            <span className="recovery-badge">
+              <IonIcon icon={keyOutline} />
+              Account recovery
+            </span>
 
-          <IonItem>
-            <IonLabel position="stacked">Email</IonLabel>
-            <IonInput
-              type="email"
-              value={email}
-              onIonInput={(e) => setEmail(String(e.detail.value ?? ''))}
-              placeholder="you@example.com"
-              required
-            />
-          </IonItem>
+            <h1 className="recovery-title">Forgot your password?</h1>
+            <p className="recovery-subtitle">
+              Enter your account email and we will send you a secure reset link.
+            </p>
 
-          <div style={{ marginTop: 16 }}>
-            <IonButton expand="block" type="submit" disabled={busy}>
-              {busy ? 'Sending…' : 'Send reset link'}
-            </IonButton>
+            <form className="recovery-form" onSubmit={handleSubmit}>
+              <IonItem>
+                <IonLabel position="stacked">Email address</IonLabel>
+                <IonInput
+                  type="email"
+                  value={email}
+                  onIonInput={(e) => setEmail(String(e.detail.value ?? '').trim())}
+                  placeholder="you@example.com"
+                  required
+                >
+                  <IonIcon icon={mailOutline} slot="end" />
+                </IonInput>
+              </IonItem>
+
+              <div className="recovery-actions">
+                <IonButton className="recovery-primary-btn" expand="block" type="submit" disabled={busy}>
+                  {busy ? 'Sending reset link...' : 'Send reset link'}
+                </IonButton>
+
+                <IonButton className="recovery-secondary-btn" fill="clear" onClick={() => router.push('/home')}>
+                  Back to login
+                </IonButton>
+              </div>
+
+              <div className="recovery-note">
+                For security, we always show the same response even if the email is not registered.
+              </div>
+            </form>
           </div>
-
-          <div style={{ marginTop: 12 }}>
-            <IonButton fill="clear" onClick={() => router.push('/home')}>Back</IonButton>
-          </div>
-        </form>
+        </div>
 
         <IonToast
           isOpen={Boolean(toastMsg)}
