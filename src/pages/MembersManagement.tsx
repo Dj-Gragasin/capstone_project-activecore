@@ -1003,15 +1003,15 @@ const MembersManagement: React.FC = () => {
               </IonItem>
 
               <IonItem>
-                <IonLabel position="stacked">Username *</IonLabel>
+                <IonLabel position="stacked">Email *</IonLabel>
                 <IonInput
-                  type="text"
+                  type="email"
                   value={currentMember.email}
                   onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, email: e.detail.value || '' })
                   }
-                  placeholder="Enter username"
+                  placeholder="Enter email"
                 />
               </IonItem>
 
