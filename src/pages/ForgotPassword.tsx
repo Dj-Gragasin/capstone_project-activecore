@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -23,21 +23,9 @@ const ForgotPassword: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const router = useIonRouter();
+  const autoSubmittedRef = useRef(false);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!normalizedEmail) {
-      setToastMsg('Please enter your email');
-      return;
-    }
-
-    if (!isValidEmailFormat(normalizedEmail)) {
-      setToastMsg('Please enter a valid email address');
-      return;
-    }
-
+  const requestVerificationCode = useCallback(async (normalizedEmail: string) => {
     setBusy(true);
     try {
       const res = await fetch(`${API_CONFIG.BASE_URL}/auth/forgot-password`, {
@@ -64,6 +52,46 @@ const ForgotPassword: React.FC = () => {
     } finally {
       setBusy(false);
     }
+  }, [router]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailFromQuery = String(params.get('email') || '').trim().toLowerCase();
+    const shouldAutoSend = params.get('autoSend') === '1';
+
+    if (!emailFromQuery) {
+      return;
+    }
+
+    setEmail(emailFromQuery);
+
+    if (!shouldAutoSend || autoSubmittedRef.current) {
+      return;
+    }
+
+    if (!isValidEmailFormat(emailFromQuery)) {
+      return;
+    }
+
+    autoSubmittedRef.current = true;
+    requestVerificationCode(emailFromQuery);
+  }, [requestVerificationCode]);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setToastMsg('Please enter your email');
+      return;
+    }
+
+    if (!isValidEmailFormat(normalizedEmail)) {
+      setToastMsg('Please enter a valid email address');
+      return;
+    }
+
+    requestVerificationCode(normalizedEmail);
   };
 
   return (
