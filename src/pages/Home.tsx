@@ -26,6 +26,10 @@ import { logIn, informationCircle, peopleCircleOutline, qrCodeOutline, barChartO
 import { loginUser } from '../services/auth.service';
 import './Home.css';
 
+const isValidEmailFormat = (value: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+};
+
 const Home: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -306,7 +310,23 @@ const Home: React.FC = () => {
                 </IonButton>
               </div>
               <div style={{ textAlign: 'center', marginTop: 12 }}>
-                <IonButton fill="clear" onClick={() => { setShowLogin(false); router.push('/forgot-password'); }} disabled={isLoggingIn}>
+                <IonButton
+                  fill="clear"
+                  onClick={() => {
+                    const normalizedEmail = email.trim().toLowerCase();
+                    setShowLogin(false);
+
+                    if (isValidEmailFormat(normalizedEmail)) {
+                      router.push(
+                        `/forgot-password?email=${encodeURIComponent(normalizedEmail)}&autoSend=1`
+                      );
+                      return;
+                    }
+
+                    router.push('/forgot-password');
+                  }}
+                  disabled={isLoggingIn}
+                >
                   Forgot password?
                 </IonButton>
               </div>
