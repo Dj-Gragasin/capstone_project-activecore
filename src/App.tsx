@@ -26,6 +26,7 @@ import "./theme/variables.css";
 /* Pages */
 import Home from "./pages/Home";
 import ForgotPassword from "./pages/ForgotPassword";
+import VerifyResetCode from "./pages/VerifyResetCode";
 import ResetPassword from "./pages/ResetPassword";
 
 /* Admin pages */
@@ -307,6 +308,7 @@ const App: React.FC = () => {
 
             {/* Password reset routes */}
             <Route exact path="/forgot-password" component={ForgotPassword} />
+            <Route exact path="/verify-reset-code" component={VerifyResetCode} />
             <Route exact path="/reset-password" component={ResetPassword} />
 
 

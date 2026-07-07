@@ -98,7 +98,7 @@ const ResetPassword: React.FC = () => {
             {!token && (
               <p className="recovery-token-warning">
                 <IonIcon icon={warningOutline} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Missing or invalid reset token. Request a new reset email.
+                Missing or invalid reset token. Request and verify a new code first.
               </p>
             )}
 

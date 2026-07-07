@@ -27,7 +27,7 @@ import { loginUser } from '../services/auth.service';
 import './Home.css';
 
 const Home: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
@@ -39,11 +39,11 @@ const Home: React.FC = () => {
   const handleLogin = async () => {
     if (isLoggingIn) return;
 
-    const submittedUsername = username.trim();
+    const submittedEmail = email.trim().toLowerCase();
     const submittedPassword = password;
 
-    if (!submittedUsername || !submittedPassword) {
-      setError('Username and password are required');
+    if (!submittedEmail || !submittedPassword) {
+      setError('Email and password are required');
       return;
     }
 
@@ -58,7 +58,7 @@ const Home: React.FC = () => {
         setLoginMessage('Logging in… (this can take a moment)');
       }, 5000);
 
-      const result = await loginUser(submittedUsername, submittedPassword);
+      const result = await loginUser(submittedEmail, submittedPassword);
       if (result.user.role === 'admin') {
         router.push('/admin', 'root', 'replace');
       } else {
@@ -274,12 +274,12 @@ const Home: React.FC = () => {
                 </IonItem>
               )}
               <IonItem>
-                <IonLabel position="stacked">Username</IonLabel>
+                <IonLabel position="stacked">Email</IonLabel>
                 <IonInput
-                  type="text"
-                  value={username}
-                  onIonInput={(e) => setUsername(String(e.detail.value ?? ''))}
-                  placeholder="Enter your username"
+                  type="email"
+                  value={email}
+                  onIonInput={(e) => setEmail(String(e.detail.value ?? ''))}
+                  placeholder="Enter your email"
                   disabled={isLoggingIn}
                 />
               </IonItem>

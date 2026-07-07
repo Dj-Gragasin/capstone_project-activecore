@@ -47,14 +47,17 @@ const ForgotPassword: React.FC = () => {
       });
 
       const data = await res.json().catch(() => ({}));
-      setToastMsg(data?.message || 'Reset link sent to your email');
+      setToastMsg(data?.message || 'If an account exists, a verification code has been sent.');
 
       if (!res.ok) {
         return;
       }
 
-      // After sending, navigate back to home/login
-      setTimeout(() => router.push('/home'), 1400);
+      // Continue to code verification step.
+      setTimeout(
+        () => router.push(`/verify-reset-code?email=${encodeURIComponent(normalizedEmail)}`),
+        900
+      );
     } catch (err) {
       console.error('Forgot password error', err);
       setToastMsg('Network error sending reset request');
@@ -75,7 +78,7 @@ const ForgotPassword: React.FC = () => {
 
             <h1 className="recovery-title">Forgot your password?</h1>
             <p className="recovery-subtitle">
-              Enter your account email and we will send you a secure reset link.
+              Enter your account email and we will send a verification code.
             </p>
 
             <form className="recovery-form" onSubmit={handleSubmit}>
@@ -94,7 +97,7 @@ const ForgotPassword: React.FC = () => {
 
               <div className="recovery-actions">
                 <IonButton className="recovery-primary-btn" expand="block" type="submit" disabled={busy}>
-                  {busy ? 'Sending reset link...' : 'Send reset link'}
+                  {busy ? 'Sending code...' : 'Send verification code'}
                 </IonButton>
 
                 <IonButton className="recovery-secondary-btn" fill="clear" onClick={() => router.push('/home')}>

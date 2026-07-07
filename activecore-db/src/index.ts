@@ -648,6 +648,22 @@ const paymentLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parsePositiveInt(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX, 6),
+  message: 'Too many password reset requests. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyResetCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parsePositiveInt(process.env.VERIFY_RESET_CODE_RATE_LIMIT_MAX, 15),
+  message: 'Too many code verification attempts. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Sentry request handler - DISABLED for debugging
 // app.use(sentryRequestHandler);
 
@@ -1866,6 +1882,54 @@ async function ensurePasswordResetTable() {
   } catch (err: any) {
     logWarn('Failed to ensure password_reset_tokens table', err?.message || String(err));
   }
+}
+
+async function ensurePasswordResetCodeTable() {
+  // Prefer PostgreSQL DDL (this backend uses `pg` behind a MySQL-placeholder wrapper).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_codes (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        code_hash VARCHAR(255) NOT NULL,
+        attempts INT NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP NOT NULL,
+        consumed_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_code_user ON password_reset_codes(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_code_expiry ON password_reset_codes(expires_at)`);
+    return;
+  } catch (err: any) {
+    // fall through
+  }
+
+  // MySQL fallback for local setups.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_codes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        code_hash VARCHAR(255) NOT NULL,
+        attempts INT NOT NULL DEFAULT 0,
+        expires_at DATETIME NOT NULL,
+        consumed_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        INDEX idx_password_reset_code_user (user_id),
+        INDEX idx_password_reset_code_expiry (expires_at)
+      )
+    `);
+  } catch (err: any) {
+    logWarn('Failed to ensure password_reset_codes table', err?.message || String(err));
+  }
+}
+
+function hashPasswordResetCode(userId: number, code: string): string {
+  return crypto
+    .createHmac('sha256', getJwtSecret())
+    .update(`${userId}:${String(code || '').trim()}`)
+    .digest('hex');
 }
 
 async function ensureMuscleGainRecordsTable() {
@@ -4239,8 +4303,9 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
+    const genericForgotPasswordMessage = 'If an account with that email exists, a verification code has been sent.';
     const rawEmail = String(req.body?.email || '').trim();
 
     if (!rawEmail) {
@@ -4258,37 +4323,37 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       [normalizedEmail]
     );
 
-    // Product requirement: only allow existing accounts to request reset.
+    // Never reveal whether an account exists for this email.
     if (!Array.isArray(users) || users.length === 0) {
-      return res.status(404).json({ message: 'No account found for this email address' });
+      return res.json({ message: genericForgotPasswordMessage });
     }
 
     const user = users[0];
     await ensurePasswordResetTable();
+    await ensurePasswordResetCodeTable();
 
-    // Clear existing tokens for this user and create a fresh one.
+    // Clear existing reset material for this user and issue a fresh code.
     await pool.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+    await pool.query('DELETE FROM password_reset_codes WHERE user_id = ?', [user.id]);
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const code = String(crypto.randomInt(100000, 1000000));
+    const codeHash = hashPasswordResetCode(Number(user.id), code);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await pool.query(
-      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
-      [user.id, tokenHash, expiresAt]
+      'INSERT INTO password_reset_codes (user_id, code_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, codeHash, expiresAt]
     );
 
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8100').replace(/\/$/, '');
-    const resetLink = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
-
-    const subject = 'Reset your ActiveCore Gym password';
+    const subject = 'Your ActiveCore Gym password reset code';
     const html = `
       <html>
         <body style="font-family: Arial, sans-serif;">
           <h2>Password reset request</h2>
           <p>Hi ${user.first_name || ''},</p>
-          <p>We received a request to reset your password. Click the link below to choose a new password. This link expires in one hour.</p>
-          <p><a href="${resetLink}">Reset your password</a></p>
+          <p>We received a request to reset your password. Use this verification code to continue:</p>
+          <p style="font-size: 24px; letter-spacing: 4px; font-weight: 700;">${code}</p>
+          <p>This code expires in 10 minutes.</p>
           <p>If you did not request a password reset, you can safely ignore this email.</p>
           <p>— ActiveCore Gym</p>
         </body>
@@ -4301,9 +4366,98 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       logError('Failed to send forgot-password email', err);
     }
 
-    return res.json({ message: 'Reset link sent to your email' });
+    return res.json({ message: genericForgotPasswordMessage });
   } catch (error: any) {
     logError('Forgot password failed', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/auth/verify-reset-code', verifyResetCodeLimiter, async (req, res) => {
+  try {
+    const rawEmail = String(req.body?.email || '').trim();
+    const rawCode = String(req.body?.code || '').trim();
+
+    if (!rawEmail || !rawCode) {
+      return res.status(400).json({ message: 'Email and code are required' });
+    }
+
+    if (!isValidEmail(rawEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    if (!/^\d{6}$/.test(rawCode)) {
+      return res.status(400).json({ message: 'Verification code must be 6 digits' });
+    }
+
+    const normalizedEmail = rawEmail.toLowerCase();
+    const [users] = await pool.query<any>(
+      'SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+      [normalizedEmail]
+    );
+
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    const userId = Number(users[0].id);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    await ensurePasswordResetTable();
+    await ensurePasswordResetCodeTable();
+
+    const [rows] = await pool.query<any>(
+      `SELECT id, attempts
+       FROM password_reset_codes
+       WHERE user_id = ?
+         AND consumed_at IS NULL
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    const codeRow = rows[0];
+    const attempts = Number(codeRow.attempts || 0);
+
+    if (attempts >= 5) {
+      await pool.query('DELETE FROM password_reset_codes WHERE id = ?', [codeRow.id]);
+      return res.status(429).json({ message: 'Too many incorrect attempts. Request a new code.' });
+    }
+
+    const incomingCodeHash = hashPasswordResetCode(userId, rawCode);
+    const [hashMatchRows] = await pool.query<any>(
+      'SELECT id FROM password_reset_codes WHERE id = ? AND code_hash = ? LIMIT 1',
+      [codeRow.id, incomingCodeHash]
+    );
+
+    if (!Array.isArray(hashMatchRows) || hashMatchRows.length === 0) {
+      await pool.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?', [codeRow.id]);
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    await pool.query('UPDATE password_reset_codes SET consumed_at = NOW() WHERE id = ?', [codeRow.id]);
+
+    // Create a short-lived reset token only after successful code verification.
+    await pool.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [userId]);
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await pool.query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [userId, tokenHash, expiresAt]
+    );
+
+    return res.json({ message: 'Code verified. You can now reset your password.', resetToken: token });
+  } catch (error: any) {
+    logError('Verify reset code failed', error);
     return res.status(500).json({ message: 'Server error' });
   }
 });
@@ -7638,6 +7792,13 @@ async function initialize() {
 (async function ensurePasswordResetTableAtStartup() {
   try {
     await ensurePasswordResetTable();
+  } catch (err) {
+  }
+})();
+
+(async function ensurePasswordResetCodeTableAtStartup() {
+  try {
+    await ensurePasswordResetCodeTable();
   } catch (err) {
   }
 })();
