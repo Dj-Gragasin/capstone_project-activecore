@@ -110,11 +110,15 @@ type AggregatedRow = {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-const computeBmiFromMetric = (weightKg: number, heightCm: number): number | null => {
+const computeBmiFromDoh = (weightKg: number, heightInput: number): number | null => {
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
-  if (!Number.isFinite(heightCm) || heightCm <= 0) return null;
+  if (!Number.isFinite(heightInput) || heightInput <= 0) return null;
 
-  const heightMeters = heightCm / 100;
+  // DOH BMI formula: BMI = weight (kg) / [height (m)]^2.
+  // Accept either meters (e.g., 1.70) or centimeters (e.g., 170).
+  const heightMeters = heightInput <= 3 ? heightInput : heightInput / 100;
+  if (!Number.isFinite(heightMeters) || heightMeters <= 0) return null;
+
   const bmi = weightKg / (heightMeters * heightMeters);
   if (!Number.isFinite(bmi)) return null;
   return bmi;
@@ -134,12 +138,12 @@ const ProgressTracker: React.FC = () => {
   const [records, setRecords] = useState<ProgressRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [weight, setWeight] = useState('');
-  const [heightCm, setHeightCm] = useState('');
+  const [heightInput, setHeightInput] = useState('');
   const [reportMode, setReportMode] = useState<ReportMode>('daily');
 
   const computedBmi = useMemo(() => {
-    return computeBmiFromMetric(parseFloat(weight), parseFloat(heightCm));
-  }, [weight, heightCm]);
+    return computeBmiFromDoh(parseFloat(weight), parseFloat(heightInput));
+  }, [weight, heightInput]);
 
   const computedBmiText = computedBmi !== null ? computedBmi.toFixed(1) : '';
 
@@ -176,7 +180,7 @@ const ProgressTracker: React.FC = () => {
   }, []);
 
   const handleUpdate = () => {
-    if (!weight || !heightCm || computedBmi === null) {
+    if (!weight || !heightInput || computedBmi === null) {
       alert('Please enter valid weight and height so BMI can be calculated automatically');
       return;
     }
@@ -231,7 +235,7 @@ const ProgressTracker: React.FC = () => {
   const clearForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
     setWeight('');
-    setHeightCm('');
+    setHeightInput('');
   };
 
   const handleDeleteAll = () => {
@@ -588,13 +592,13 @@ const ProgressTracker: React.FC = () => {
                   <span>BMI</span>
                 </div>
                 <IonItem>
-                  <IonLabel position="stacked">Height (cm)</IonLabel>
+                  <IonLabel position="stacked">Height (cm or m)</IonLabel>
                   <IonInput
                     type="number"
-                    value={heightCm}
+                    value={heightInput}
                     onKeyDown={handleProgressInputKeyDown}
-                    onIonChange={e => setHeightCm(e.detail.value!)}
-                    placeholder="e.g., 170"
+                    onIonChange={e => setHeightInput(e.detail.value!)}
+                    placeholder="e.g., 170 or 1.70"
                   />
                 </IonItem>
                 <IonItem>
@@ -606,6 +610,7 @@ const ProgressTracker: React.FC = () => {
                     placeholder="Auto-calculated"
                   />
                 </IonItem>
+                <div className="bmi-calc-hint">DOH formula: BMI = weight(kg) / height(m)^2</div>
               </div>
             </IonCol>
           </IonRow>
