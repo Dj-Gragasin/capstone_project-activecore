@@ -100,6 +100,7 @@ interface SplitFieldConfig {
 interface MuscleGainRecord {
   date: string;
   splitType: SplitKey;
+  difficulty: DifficultyKey;
   workoutValues: Record<string, number>;
 }
 
@@ -609,6 +610,80 @@ const splitFieldConfig: Record<SplitKey, SplitFieldConfig> = {
   },
 };
 
+const splitFieldConfigByDifficulty: Record<DifficultyKey, Record<SplitKey, SplitFieldConfig>> = {
+  beginner: {
+    push: {
+      title: 'Push Day (Beginner)',
+      description: 'Use beginner-safe movements and controlled reps.',
+      fields: [
+        { label: 'Incline Push-Up (reps)', key: 'inclinePushupReps' },
+        { label: 'Machine Chest Press (kg)', key: 'machineChestPress' },
+        { label: 'Seated DB Shoulder Press (kg)', key: 'seatedDbShoulderPress' },
+        { label: 'Lateral Raise (kg)', key: 'lateralRaise' },
+        { label: 'Rope Triceps Pushdown (kg)', key: 'ropeTricepsPushdown' },
+      ],
+    },
+    pull: {
+      title: 'Pull Day (Beginner)',
+      description: 'Focus on posture and controlled pulling mechanics.',
+      fields: [
+        { label: 'Lat Pulldown (kg)', key: 'latPulldown' },
+        { label: 'Chest-Supported Row (kg)', key: 'chestSupportedRow' },
+        { label: 'Seated Cable Row (kg)', key: 'seatedCableRow' },
+        { label: 'Face Pull (kg)', key: 'facePull' },
+        { label: 'DB Curl (kg)', key: 'dbCurl' },
+      ],
+    },
+    legs: {
+      title: 'Leg Day (Beginner)',
+      description: 'Build lower-body fundamentals with stable patterns.',
+      fields: [
+        { label: 'Goblet Squat (kg)', key: 'gobletSquat' },
+        { label: 'Leg Press (kg)', key: 'legPress' },
+        { label: 'DB Romanian Deadlift (kg)', key: 'dbRomanianDeadlift' },
+        { label: 'Seated Leg Curl (kg)', key: 'seatedLegCurl' },
+        { label: 'Standing Calf Raise (kg)', key: 'calfRaise' },
+      ],
+    },
+  },
+  intermediate: splitFieldConfig,
+  advanced: {
+    push: {
+      title: 'Push Day (Advanced)',
+      description: 'Track heavy compounds and assistance volume.',
+      fields: [
+        { label: 'Bench Press (kg)', key: 'benchPress' },
+        { label: 'Incline Press (kg)', key: 'inclinePress' },
+        { label: 'Overhead Press (kg)', key: 'overheadPress' },
+        { label: 'Lateral Raise (kg)', key: 'lateralRaise' },
+        { label: 'Skullcrusher/Pushdown (kg)', key: 'tricepsIsolation' },
+      ],
+    },
+    pull: {
+      title: 'Pull Day (Advanced)',
+      description: 'Track heavy pulls with shoulder-health accessories.',
+      fields: [
+        { label: 'Deadlift (kg)', key: 'deadlift' },
+        { label: 'Weighted Pull-Up / Pulldown (kg)', key: 'weightedPullupOrPulldown' },
+        { label: 'Barbell/Chest-Supported Row (kg)', key: 'barbellOrSupportedRow' },
+        { label: 'Face Pull / Rear-Delt Fly (kg)', key: 'rearDeltAccessory' },
+        { label: 'Barbell/Incline Curl (kg)', key: 'barbellOrInclineCurl' },
+      ],
+    },
+    legs: {
+      title: 'Leg Day (Advanced)',
+      description: 'Capture strength-biased lower-body progression.',
+      fields: [
+        { label: 'Back/Front Squat (kg)', key: 'backOrFrontSquat' },
+        { label: 'Romanian Deadlift (kg)', key: 'romanianDeadlift' },
+        { label: 'Leg Press/Hack Squat (kg)', key: 'legPressOrHackSquat' },
+        { label: 'Leg Curl (kg)', key: 'legCurl' },
+        { label: 'Calf Raise (kg)', key: 'calfRaise' },
+      ],
+    },
+  },
+};
+
 const toNumber = (v: unknown): number => {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -635,8 +710,10 @@ const compactHeaderLabel = (label: string): string => {
 
 const normalizeRecord = (record: any): MuscleGainRecord => {
   const splitType = (record?.splitType as SplitKey) || 'push';
+  const difficulty = (record?.difficulty as DifficultyKey) || 'intermediate';
+  const fieldSource = splitFieldConfigByDifficulty[difficulty] || splitFieldConfigByDifficulty.intermediate;
   const fallbackValues = Object.fromEntries(
-    splitFieldConfig[splitType].fields.map((field, index) => {
+    fieldSource[splitType].fields.map((field, index) => {
       const legacyValue = record?.workoutValues?.[field.key];
       if (legacyValue !== undefined && legacyValue !== null) {
         return [field.key, toNumber(legacyValue)];
@@ -656,6 +733,7 @@ const normalizeRecord = (record: any): MuscleGainRecord => {
   return {
     date: record?.date || '',
     splitType,
+    difficulty,
     workoutValues: fallbackValues,
   };
 };
@@ -735,6 +813,7 @@ const MuscleGainTracker: React.FC = () => {
   const ageBand = getAgeBand(age);
   const ageGuidance = ageGuidanceByBand[ageBand];
   const selectedWeeklyPlan = weeklySplitPlans[difficulty];
+  const selectedSplitFieldConfig = splitFieldConfigByDifficulty[difficulty][activeSplit];
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
@@ -742,11 +821,7 @@ const MuscleGainTracker: React.FC = () => {
       const stored = localStorage.getItem('muscleGainRecords');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setRecords(
-          Array.isArray(parsed)
-            ? parsed.map((record: any) => ({ ...record, splitType: record.splitType || 'push' }))
-            : []
-        );
+        setRecords(Array.isArray(parsed) ? parsed.map((record: any) => normalizeRecord(record)) : []);
       }
       return;
     }
@@ -772,7 +847,8 @@ const MuscleGainTracker: React.FC = () => {
 
   useEffect(() => {
     const initialStats = Object.fromEntries(
-      Object.values(splitFieldConfig)
+      Object.values(splitFieldConfigByDifficulty)
+        .flatMap((configBySplit) => Object.values(configBySplit))
         .flatMap(config => config.fields)
         .map(field => [field.key, ''])
     );
@@ -781,14 +857,15 @@ const MuscleGainTracker: React.FC = () => {
   }, []);
 
   const validateInputs = () => {
-    const splitFields = splitFieldConfig[activeSplit].fields.map(field => field.key);
+    const splitFields = selectedSplitFieldConfig.fields.map(field => field.key);
     return splitFields.some(fieldKey => Boolean(strengthStats[fieldKey]));
   };
 
   const clearForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
     const emptyStats = Object.fromEntries(
-      Object.values(splitFieldConfig)
+      Object.values(splitFieldConfigByDifficulty)
+        .flatMap((configBySplit) => Object.values(configBySplit))
         .flatMap(config => config.fields)
         .map(field => [field.key, ''])
     );
@@ -802,12 +879,13 @@ const MuscleGainTracker: React.FC = () => {
     }
 
     const workoutValues = Object.fromEntries(
-      splitFieldConfig[activeSplit].fields.map(field => [field.key, parseFloat(strengthStats[field.key] || '0')])
+      selectedSplitFieldConfig.fields.map(field => [field.key, parseFloat(strengthStats[field.key] || '0')])
     );
 
     const newRecord: MuscleGainRecord = {
       date,
       splitType: activeSplit,
+      difficulty,
       workoutValues,
     };
 
@@ -889,11 +967,13 @@ const MuscleGainTracker: React.FC = () => {
     .map(normalizeRecord)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const selectedRecordItems = displayRecords.filter(record => record.splitType === activeSplit);
-  const selectedRecordFields = splitFieldConfig[activeSplit].fields;
+  const selectedRecordItems = displayRecords.filter(
+    record => record.splitType === activeSplit && record.difficulty === difficulty
+  );
+  const selectedRecordFields = selectedSplitFieldConfig.fields;
 
   const selectedChartRecords = displayRecords
-    .filter(record => record.splitType === activeSplit)
+    .filter(record => record.splitType === activeSplit && record.difficulty === difficulty)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const chartLabels = Array.from(new Set(selectedChartRecords.map(record => record.date).filter(Boolean)))
@@ -901,7 +981,7 @@ const MuscleGainTracker: React.FC = () => {
 
   const chartData = {
     labels: chartLabels,
-    datasets: splitFieldConfig[activeSplit].fields.map((field, index) => ({
+    datasets: selectedSplitFieldConfig.fields.map((field, index) => ({
       label: compactHeaderLabel(field.label),
       data: chartLabels.map(date => {
         const record = [...selectedChartRecords].reverse().find(item => item.date === date);
@@ -939,7 +1019,7 @@ const MuscleGainTracker: React.FC = () => {
       legend: { position: 'top', labels: { color: '#ffffff' } },
       title: {
         display: true,
-        text: `${splitFieldConfig[activeSplit].title} Progress` ,
+        text: `${selectedSplitFieldConfig.title} Progress` ,
         color: '#ffffff',
         font: { size: 16 },
       },
@@ -983,8 +1063,8 @@ const MuscleGainTracker: React.FC = () => {
                   </div>
 
                   <div className="focus-card">
-                    <div className="focus-card-title">{splitFieldConfig[activeSplit].title}</div>
-                    <p>{splitFieldConfig[activeSplit].description}</p>
+                    <div className="focus-card-title">{selectedSplitFieldConfig.title}</div>
+                    <p>{selectedSplitFieldConfig.description}</p>
                   </div>
 
                   <IonItem className="tracker-input">
@@ -992,7 +1072,7 @@ const MuscleGainTracker: React.FC = () => {
                     <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value ?? '')} />
                   </IonItem>
                   <div className="input-grid">
-                    {splitFieldConfig[activeSplit].fields.map(field => (
+                    {selectedSplitFieldConfig.fields.map(field => (
                       <IonItem key={field.key} className="tracker-input">
                         <IonLabel position="stacked">{field.label}</IonLabel>
                         <IonInput
@@ -1030,7 +1110,7 @@ const MuscleGainTracker: React.FC = () => {
               {selectedRecordItems.length === 0 && (
                 <div className="panel">
                   <p className="records-empty-state">
-                    No {activeSplit} records yet.
+                    No {difficulty} {activeSplit} records yet.
                   </p>
                 </div>
               )}
