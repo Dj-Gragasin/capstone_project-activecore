@@ -141,6 +141,82 @@
   line-height: 1.6;
 }
 
+.age-guidance-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.age-guidance-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.age-guidance-card h3 {
+  margin: 0 0 8px;
+  color: #67e8f9;
+}
+
+.age-guidance-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.55;
+}
+
+.weekly-plan-panel {
+  margin-bottom: 14px;
+}
+
+.weekly-plan-subtitle {
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.week-day-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px;
+  min-height: 110px;
+}
+
+.week-day-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.week-day-name {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #67e8f9;
+  font-weight: 700;
+}
+
+.week-day-workout {
+  font-weight: 700;
+  color: #f5f7fb;
+}
+
+.week-day-note {
+  margin: 0;
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.35;
+}
+
 .exercise-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -183,6 +259,31 @@
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.4;
+}
+
+.safety-panel {
+  margin-top: 14px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.safety-list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.87);
+  line-height: 1.5;
+}
+
+.safety-list li + li {
+  margin-top: 6px;
+}
+
+.medical-note {
+  margin: 10px 0 0;
+  color: #fef3c7;
+  font-size: 0.88rem;
 }
 
 .chart-panel {
@@ -271,6 +372,14 @@
   .tracker-hero {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .age-guidance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .input-grid,

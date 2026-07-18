@@ -20,7 +20,7 @@ import {
   IonRow,
   IonCol,
 } from '@ionic/react';
-import { barbell, analytics } from 'ionicons/icons';
+import { barbell, analytics, calendarOutline, warningOutline, personOutline } from 'ionicons/icons';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -50,6 +50,7 @@ ChartJS.register(
 
 type SplitKey = 'push' | 'pull' | 'legs';
 type DifficultyKey = 'beginner' | 'intermediate' | 'advanced';
+type AgeBand = 'unknown' | 'under18' | '18to39' | '40to54' | '55plus';
 
 interface ExerciseItem {
   name: string;
@@ -67,6 +68,26 @@ interface DifficultyProfile {
   focus: string;
 }
 
+interface WeeklySplitDay {
+  day: string;
+  workout: string;
+  note: string;
+}
+
+interface WeeklySplitPlan {
+  title: string;
+  subtitle: string;
+  days: WeeklySplitDay[];
+}
+
+interface AgeGuidance {
+  label: string;
+  intensity: string;
+  recovery: string;
+  focus: string;
+  caution: string;
+}
+
 interface SplitFieldConfig {
   title: string;
   description: string;
@@ -82,142 +103,474 @@ interface MuscleGainRecord {
   workoutValues: Record<string, number>;
 }
 
-const splitPlans: Record<SplitKey, ExerciseItem[]> = {
-  push: [
-    {
-      name: 'Bench Press',
-      target: 'Chest, shoulders, triceps',
-      sets: '3–4 sets',
-      reps: '8–12 reps',
-      description: 'A compound press that builds upper-body pushing strength and size.',
-    },
-    {
-      name: 'Incline Dumbbell Press',
-      target: 'Upper chest, shoulders',
-      sets: '3 sets',
-      reps: '10–12 reps',
-      description: 'Highlights the upper chest and helps create a fuller push look.',
-    },
-    {
-      name: 'Overhead Press',
-      target: 'Shoulders, triceps',
-      sets: '3 sets',
-      reps: '8–12 reps',
-      description: 'Develops shoulder strength and helps support pressing volume.',
-    },
-    {
-      name: 'Lateral Raises',
-      target: 'Side delts',
-      sets: '3 sets',
-      reps: '12–15 reps',
-      description: 'Great for building shoulder width and improving upper-body shape.',
-    },
-    {
-      name: 'Triceps Pushdown',
-      target: 'Triceps',
-      sets: '3 sets',
-      reps: '10–15 reps',
-      description: 'Adds direct triceps work to improve arm size and pressing performance.',
-    },
-  ],
-  pull: [
-    {
-      name: 'Deadlift',
-      target: 'Back, glutes, hamstrings',
-      sets: '3–4 sets',
-      reps: '5–8 reps',
-      description: 'A powerful hinge movement that builds total-body strength and back mass.',
-    },
-    {
-      name: 'Barbell Row',
-      target: 'Upper back, lats',
-      sets: '3 sets',
-      reps: '8–12 reps',
-      description: 'Improves posture and strengthens the mid-back for balanced growth.',
-    },
-    {
-      name: 'Lat Pulldown',
-      target: 'Lats, biceps',
-      sets: '3 sets',
-      reps: '10–12 reps',
-      description: 'Helps build a wider back and strengthens pull movement patterns.',
-    },
-    {
-      name: 'Face Pull',
-      target: 'Rear delts, rotator cuff',
-      sets: '3 sets',
-      reps: '12–15 reps',
-      description: 'Support shoulder health while adding upper-back volume.',
-    },
-    {
-      name: 'Bicep Curl',
-      target: 'Biceps',
-      sets: '3 sets',
-      reps: '10–15 reps',
-      description: 'Adds direct arm work to support pulling strength and arm size.',
-    },
-  ],
-  legs: [
-    {
-      name: 'Squat',
-      target: 'Quads, glutes',
-      sets: '3–4 sets',
-      reps: '8–12 reps',
-      description: 'The foundation of leg training and one of the best overall mass builders.',
-    },
-    {
-      name: 'Romanian Deadlift',
-      target: 'Hamstrings, glutes',
-      sets: '3 sets',
-      reps: '8–12 reps',
-      description: 'Excellent for building hamstrings and improving posterior-chain strength.',
-    },
-    {
-      name: 'Leg Press',
-      target: 'Quads, glutes',
-      sets: '3 sets',
-      reps: '10–12 reps',
-      description: 'Lets you train legs hard while keeping tension on the target muscles.',
-    },
-    {
-      name: 'Leg Curl',
-      target: 'Hamstrings',
-      sets: '3 sets',
-      reps: '10–15 reps',
-      description: 'Adds isolation volume for the hamstrings and supports leg balance.',
-    },
-    {
-      name: 'Standing Calf Raise',
-      target: 'Calves',
-      sets: '3 sets',
-      reps: '12–15 reps',
-      description: 'Useful for calf size and ankle strength, especially for lower-body development.',
-    },
-  ],
+const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
+  beginner: {
+    push: [
+      {
+        name: 'Incline Push-Up',
+        target: 'Chest, shoulders, triceps',
+        sets: '2–3 sets',
+        reps: '8–12 reps',
+        description: 'Build pressing mechanics safely before moving to heavy barbell work.',
+      },
+      {
+        name: 'Machine Chest Press',
+        target: 'Chest, front delts, triceps',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Stable setup helps beginners focus on range of motion and control.',
+      },
+      {
+        name: 'Seated Dumbbell Shoulder Press',
+        target: 'Shoulders, triceps',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Safer shoulder-friendly press with manageable loading.',
+      },
+      {
+        name: 'Lateral Raise',
+        target: 'Side delts',
+        sets: '2–3 sets',
+        reps: '12–15 reps',
+        description: 'Light accessory work for shoulder balance and posture.',
+      },
+      {
+        name: 'Rope Triceps Pushdown',
+        target: 'Triceps',
+        sets: '2–3 sets',
+        reps: '12–15 reps',
+        description: 'Controlled elbow extension to finish push sessions safely.',
+      },
+    ],
+    pull: [
+      {
+        name: 'Lat Pulldown',
+        target: 'Lats, biceps',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Foundational vertical pull that builds back strength with less risk.',
+      },
+      {
+        name: 'Chest-Supported Row',
+        target: 'Upper back, lats',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Reduces lower-back fatigue while teaching clean rowing mechanics.',
+      },
+      {
+        name: 'Seated Cable Row',
+        target: 'Mid-back, lats',
+        sets: '2–3 sets',
+        reps: '10–12 reps',
+        description: 'Builds pulling strength and helps improve posture.',
+      },
+      {
+        name: 'Face Pull',
+        target: 'Rear delts, rotator cuff',
+        sets: '2–3 sets',
+        reps: '12–15 reps',
+        description: 'Supports shoulder health and balances pressing volume.',
+      },
+      {
+        name: 'Dumbbell Curl',
+        target: 'Biceps',
+        sets: '2–3 sets',
+        reps: '10–15 reps',
+        description: 'Simple arm work to support pull-day development.',
+      },
+    ],
+    legs: [
+      {
+        name: 'Goblet Squat',
+        target: 'Quads, glutes, core',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Great first squat pattern for depth, bracing, and balance.',
+      },
+      {
+        name: 'Leg Press',
+        target: 'Quads, glutes',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Adds lower-body volume with stable machine support.',
+      },
+      {
+        name: 'Dumbbell Romanian Deadlift',
+        target: 'Hamstrings, glutes',
+        sets: '2–3 sets',
+        reps: '10–12 reps',
+        description: 'Beginner hinge work without the load demands of heavy deadlifts.',
+      },
+      {
+        name: 'Seated Leg Curl',
+        target: 'Hamstrings',
+        sets: '2–3 sets',
+        reps: '12–15 reps',
+        description: 'Direct hamstring work for knee stability and balance.',
+      },
+      {
+        name: 'Standing Calf Raise',
+        target: 'Calves',
+        sets: '2–3 sets',
+        reps: '12–15 reps',
+        description: 'Builds ankle strength and lower-leg endurance.',
+      },
+    ],
+  },
+  intermediate: {
+    push: [
+      {
+        name: 'Bench Press',
+        target: 'Chest, shoulders, triceps',
+        sets: '3–4 sets',
+        reps: '6–10 reps',
+        description: 'Primary compound press for progressive overload and muscle gain.',
+      },
+      {
+        name: 'Incline Dumbbell Press',
+        target: 'Upper chest, shoulders',
+        sets: '3 sets',
+        reps: '8–12 reps',
+        description: 'Improves upper-chest development and pressing balance.',
+      },
+      {
+        name: 'Overhead Press',
+        target: 'Shoulders, triceps',
+        sets: '3 sets',
+        reps: '8–10 reps',
+        description: 'Builds vertical pressing strength with strict technique.',
+      },
+      {
+        name: 'Lateral Raise',
+        target: 'Side delts',
+        sets: '3 sets',
+        reps: '12–15 reps',
+        description: 'Adds shoulder volume with low joint stress.',
+      },
+      {
+        name: 'Triceps Pushdown',
+        target: 'Triceps',
+        sets: '3 sets',
+        reps: '10–15 reps',
+        description: 'Supports pressing lockout and upper-arm growth.',
+      },
+    ],
+    pull: [
+      {
+        name: 'Trap-Bar Deadlift',
+        target: 'Back, glutes, hamstrings',
+        sets: '3 sets',
+        reps: '5–8 reps',
+        description: 'Intermediate-friendly deadlift variation with cleaner mechanics.',
+      },
+      {
+        name: 'Barbell Row',
+        target: 'Upper back, lats',
+        sets: '3 sets',
+        reps: '8–10 reps',
+        description: 'Adds back thickness and carries over to heavy pulls.',
+      },
+      {
+        name: 'Lat Pulldown',
+        target: 'Lats, biceps',
+        sets: '3 sets',
+        reps: '8–12 reps',
+        description: 'High-quality vertical pulling for back width.',
+      },
+      {
+        name: 'Face Pull',
+        target: 'Rear delts, external rotators',
+        sets: '3 sets',
+        reps: '12–15 reps',
+        description: 'Supports shoulder integrity and posture under higher volumes.',
+      },
+      {
+        name: 'EZ-Bar Curl',
+        target: 'Biceps, forearms',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Direct arm work with a wrist-friendlier grip option.',
+      },
+    ],
+    legs: [
+      {
+        name: 'Back Squat',
+        target: 'Quads, glutes, core',
+        sets: '3–4 sets',
+        reps: '6–10 reps',
+        description: 'Main lower-body strength and mass movement.',
+      },
+      {
+        name: 'Romanian Deadlift',
+        target: 'Hamstrings, glutes',
+        sets: '3 sets',
+        reps: '8–10 reps',
+        description: 'Key posterior-chain lift for strength and injury prevention.',
+      },
+      {
+        name: 'Leg Press',
+        target: 'Quads, glutes',
+        sets: '3 sets',
+        reps: '10–12 reps',
+        description: 'Additional quad volume without heavy spinal loading.',
+      },
+      {
+        name: 'Leg Curl',
+        target: 'Hamstrings',
+        sets: '3 sets',
+        reps: '10–15 reps',
+        description: 'Complements hinge work and supports knee health.',
+      },
+      {
+        name: 'Standing Calf Raise',
+        target: 'Calves',
+        sets: '3 sets',
+        reps: '12–15 reps',
+        description: 'Adds lower-leg strength for better lower-body function.',
+      },
+    ],
+  },
+  advanced: {
+    push: [
+      {
+        name: 'Bench Press (Heavy Day)',
+        target: 'Chest, shoulders, triceps',
+        sets: '4–5 sets',
+        reps: '4–8 reps',
+        description: 'Primary heavy press for strength-biased hypertrophy.',
+      },
+      {
+        name: 'Incline Barbell or Dumbbell Press',
+        target: 'Upper chest, front delts',
+        sets: '4 sets',
+        reps: '6–10 reps',
+        description: 'Second compound press to drive upper-chest development.',
+      },
+      {
+        name: 'Overhead Press',
+        target: 'Shoulders, triceps',
+        sets: '3–4 sets',
+        reps: '6–10 reps',
+        description: 'Vertical press for full shoulder and triceps output.',
+      },
+      {
+        name: 'Cable or Dumbbell Lateral Raise',
+        target: 'Side delts',
+        sets: '3–4 sets',
+        reps: '12–20 reps',
+        description: 'High-rep shoulder isolation to complement heavy pressing.',
+      },
+      {
+        name: 'Skullcrusher or Pushdown',
+        target: 'Triceps',
+        sets: '3–4 sets',
+        reps: '10–15 reps',
+        description: 'Arm specialization work to finish push sessions.',
+      },
+    ],
+    pull: [
+      {
+        name: 'Conventional Deadlift',
+        target: 'Back, glutes, hamstrings',
+        sets: '3–4 sets',
+        reps: '3–6 reps',
+        description: 'High-demand pull reserved for advanced technique and recovery.',
+      },
+      {
+        name: 'Weighted Pull-Up or Lat Pulldown',
+        target: 'Lats, upper back, biceps',
+        sets: '4 sets',
+        reps: '6–10 reps',
+        description: 'Vertical pulling focus for width and upper-body strength.',
+      },
+      {
+        name: 'Barbell or Chest-Supported Row',
+        target: 'Mid-back, lats',
+        sets: '4 sets',
+        reps: '6–10 reps',
+        description: 'Heavy horizontal pull to increase overall back density.',
+      },
+      {
+        name: 'Face Pull or Rear-Delt Fly',
+        target: 'Rear delts, rotator cuff',
+        sets: '3 sets',
+        reps: '12–20 reps',
+        description: 'Shoulder prehab-style volume to balance pressing stress.',
+      },
+      {
+        name: 'Barbell or Incline Dumbbell Curl',
+        target: 'Biceps, brachialis',
+        sets: '3–4 sets',
+        reps: '8–12 reps',
+        description: 'Targeted arm work to support heavy pulling progression.',
+      },
+    ],
+    legs: [
+      {
+        name: 'Back or Front Squat',
+        target: 'Quads, glutes, core',
+        sets: '4–5 sets',
+        reps: '4–8 reps',
+        description: 'Primary lower-body strength lift with progressive overload.',
+      },
+      {
+        name: 'Romanian Deadlift',
+        target: 'Hamstrings, glutes',
+        sets: '4 sets',
+        reps: '6–10 reps',
+        description: 'Posterior-chain loading to support leg and pull performance.',
+      },
+      {
+        name: 'Leg Press or Hack Squat',
+        target: 'Quads, glutes',
+        sets: '3–4 sets',
+        reps: '8–12 reps',
+        description: 'Extra volume for quad growth after heavy squat work.',
+      },
+      {
+        name: 'Leg Curl',
+        target: 'Hamstrings',
+        sets: '3–4 sets',
+        reps: '10–15 reps',
+        description: 'Isolation volume for hamstring size and knee resilience.',
+      },
+      {
+        name: 'Seated or Standing Calf Raise',
+        target: 'Calves',
+        sets: '4 sets',
+        reps: '10–15 reps',
+        description: 'Dedicated calf training for complete lower-body development.',
+      },
+    ],
+  },
 };
 
 const difficultyProfiles: Record<DifficultyKey, DifficultyProfile> = {
   beginner: {
     title: 'Beginner',
     days: '3 workout days/week',
-    sets: '3 sets/exercise',
+    sets: '2–3 sets/exercise',
     load: 'Light to moderate weights',
-    focus: 'Focus on proper form',
+    focus: 'Master movement quality and consistency',
   },
   intermediate: {
     title: 'Intermediate',
     days: '4–5 workout days/week',
     sets: '3–4 sets/exercise',
-    load: 'Moderate weight',
-    focus: 'Progressive overload',
+    load: 'Moderate to challenging loads',
+    focus: 'Progressive overload and balanced recovery',
   },
   advanced: {
     title: 'Advanced',
-    days: '5–6 workout days/week',
+    days: '5–6 workout days/week (PPL x2)',
     sets: '4–5 sets/exercise',
-    load: 'Heavy weights',
-    focus: 'Advanced intensity techniques',
+    load: 'Heavy loads with planned fatigue management',
+    focus: 'High volume and advanced intensity control',
   },
+};
+
+const weeklySplitPlans: Record<DifficultyKey, WeeklySplitPlan> = {
+  beginner: {
+    title: '3-Day Foundation Split',
+    subtitle: 'Simple weekly flow focused on technique and full recovery.',
+    days: [
+      { day: 'Mon', workout: 'Push', note: 'Learn press patterns and control tempo.' },
+      { day: 'Tue', workout: 'Recovery', note: 'Walk, stretch, or mobility (20–30 min).' },
+      { day: 'Wed', workout: 'Pull', note: 'Back and posture-focused pulling session.' },
+      { day: 'Thu', workout: 'Recovery', note: 'Sleep and hydration priority day.' },
+      { day: 'Fri', workout: 'Legs', note: 'Lower-body basics plus core stability.' },
+      { day: 'Sat', workout: 'Active Rest', note: 'Light cardio and mobility only.' },
+      { day: 'Sun', workout: 'Full Rest', note: 'No heavy lifting; prepare for next week.' },
+    ],
+  },
+  intermediate: {
+    title: '5-Day Growth Split',
+    subtitle: 'Higher weekly volume while preserving at least two lighter days.',
+    days: [
+      { day: 'Mon', workout: 'Push', note: 'Primary pressing strength and accessories.' },
+      { day: 'Tue', workout: 'Pull', note: 'Rows, pulldowns, and rear-delt work.' },
+      { day: 'Wed', workout: 'Recovery', note: 'Light cardio, mobility, and sleep focus.' },
+      { day: 'Thu', workout: 'Legs', note: 'Squat/hinge session with controlled volume.' },
+      { day: 'Fri', workout: 'Push (Volume)', note: 'Lighter loads, higher reps, clean form.' },
+      { day: 'Sat', workout: 'Pull (Volume)', note: 'Back and arm volume, avoid max efforts.' },
+      { day: 'Sun', workout: 'Full Rest', note: 'Next week starts with Legs for balance.' },
+    ],
+  },
+  advanced: {
+    title: '6-Day PPL x2 Split',
+    subtitle: 'High-frequency schedule for lifters with strong recovery habits.',
+    days: [
+      { day: 'Mon', workout: 'Push A', note: 'Heavier compounds first, then accessories.' },
+      { day: 'Tue', workout: 'Pull A', note: 'Deadlift variant plus heavy rows.' },
+      { day: 'Wed', workout: 'Legs A', note: 'Strength-biased squat day.' },
+      { day: 'Thu', workout: 'Push B', note: 'Different angles, moderate load and volume.' },
+      { day: 'Fri', workout: 'Pull B', note: 'Horizontal/vertical pull balance and arms.' },
+      { day: 'Sat', workout: 'Legs B', note: 'Volume-focused lower-body session.' },
+      { day: 'Sun', workout: 'Full Rest', note: 'Recovery check before next cycle.' },
+    ],
+  },
+};
+
+const ageGuidanceByBand: Record<AgeBand, AgeGuidance> = {
+  unknown: {
+    label: 'Age-based guidance ready',
+    intensity: 'Set your age to receive tailored intensity and recovery guidance.',
+    recovery: 'Default rule: rest 48 hours before training the same muscles hard again.',
+    focus: 'Start conservative and increase load only when technique stays stable.',
+    caution: 'If you have medical conditions or pain history, get medical clearance first.',
+  },
+  under18: {
+    label: 'Under 18',
+    intensity: 'Use moderate loads; avoid max-effort singles or forced reps.',
+    recovery: 'At least 1 full rest day between heavy sessions.',
+    focus: 'Prioritize movement quality, supervision, and consistency over heavy weight.',
+    caution: 'Train with a coach or adult spotter for all compound lifts.',
+  },
+  '18to39': {
+    label: '18–39',
+    intensity: 'Progress load gradually when all prescribed reps are clean.',
+    recovery: '1–2 rest days weekly and deload every 6–8 weeks as needed.',
+    focus: 'Balanced overload and sleep/nutrition to maximize hypertrophy.',
+    caution: 'Avoid ego lifting and keep 1–2 reps in reserve on heavy compounds.',
+  },
+  '40to54': {
+    label: '40–54',
+    intensity: 'Use controlled tempo and moderate-heavy loads with strict form.',
+    recovery: 'Add extra warm-up sets and prioritize 48–72h recovery for sore joints.',
+    focus: 'Joint-friendly variations (trap bar, machine press, chest-supported row).',
+    caution: 'Reduce volume at first signs of tendon/joint irritation.',
+  },
+  '55plus': {
+    label: '55+',
+    intensity: 'Use moderate loads and avoid frequent near-failure work.',
+    recovery: 'Include additional recovery days and lower-impact conditioning.',
+    focus: 'Strength, stability, and balance with safe range of motion.',
+    caution: 'Stop any exercise that causes sharp pain, dizziness, or unusual breathlessness.',
+  },
+};
+
+const sharedSafetyNotes = [
+  'Warm up for 5–10 minutes, then do 2–3 lighter ramp-up sets before your first heavy compound lift.',
+  'Use a spotter or safety pins for bench press and squat, especially when load increases.',
+  'Keep your spine neutral on squats, hinges, and deadlifts. Stop the set if your form breaks.',
+  'Do not hold your breath for too long; brace properly and breathe between reps.',
+  'Increase weight gradually (about 2.5–5 kg for big lifts) only after you hit rep targets cleanly.',
+  'Sharp pain is a stop signal. Do not push through pain that feels unstable, pinching, or sudden.',
+];
+
+const splitSpecificCautions: Record<SplitKey, string[]> = {
+  push: [
+    'Keep shoulder blades retracted during presses to protect shoulder joints.',
+    'Do not flare elbows aggressively on bench press; keep controlled bar path.',
+  ],
+  pull: [
+    'For deadlifts, brace before each rep and keep the bar close to the body.',
+    'If lower back rounds under load, reduce weight and reset technique immediately.',
+  ],
+  legs: [
+    'On squats and leg press, keep knees tracking over toes and avoid knee collapse inward.',
+    'For Romanian deadlifts, hinge from hips and avoid excessive lumbar flexion.',
+  ],
 };
 
 const splitFieldConfig: Record<SplitKey, SplitFieldConfig> = {
@@ -307,12 +660,81 @@ const normalizeRecord = (record: any): MuscleGainRecord => {
   };
 };
 
+const parseStoredProfile = (raw: string | null): Record<string, unknown> | null => {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const ageFromDateInput = (value: unknown): number | null => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    now.getMonth() > dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() >= dob.getDate());
+  if (!hasBirthdayPassed) age -= 1;
+
+  if (age < 10 || age > 100) return null;
+  return age;
+};
+
+const inferInitialAge = (): number | null => {
+  const profileKeys = ['user', 'currentUser'];
+  const dateFields = ['dateOfBirth', 'date_of_birth', 'dob', 'birthDate'];
+  const ageFields = ['age'];
+
+  for (const storageKey of profileKeys) {
+    const profile = parseStoredProfile(localStorage.getItem(storageKey));
+    if (!profile) continue;
+
+    for (const field of ageFields) {
+      const ageValue = Number(profile[field]);
+      if (Number.isFinite(ageValue) && ageValue >= 10 && ageValue <= 100) {
+        return Math.floor(ageValue);
+      }
+    }
+
+    for (const field of dateFields) {
+      const age = ageFromDateInput(profile[field]);
+      if (age !== null) return age;
+    }
+  }
+
+  return null;
+};
+
+const getAgeBand = (age: number | null): AgeBand => {
+  if (age === null) return 'unknown';
+  if (age < 18) return 'under18';
+  if (age <= 39) return '18to39';
+  if (age <= 54) return '40to54';
+  return '55plus';
+};
+
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
+  const [ageInput, setAgeInput] = useState<string>(() => {
+    const inferredAge = inferInitialAge();
+    return inferredAge !== null ? String(inferredAge) : '';
+  });
+
+  const parsedAge = Number.parseInt(ageInput, 10);
+  const age = Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : null;
+  const ageBand = getAgeBand(age);
+  const ageGuidance = ageGuidanceByBand[ageBand];
+  const selectedWeeklyPlan = weeklySplitPlans[difficulty];
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
@@ -693,8 +1115,51 @@ const MuscleGainTracker: React.FC = () => {
               </ul>
             </div>
 
+            <div className="age-guidance-grid">
+              <IonItem className="tracker-input">
+                <IonIcon icon={personOutline} slot="start" />
+                <IonLabel position="stacked">Age (years)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={ageInput}
+                  min={10}
+                  max={100}
+                  onIonChange={e => setAgeInput((e.detail.value ?? '').replace(/[^\d]/g, ''))}
+                />
+              </IonItem>
+
+              <div className="age-guidance-card">
+                <h3>{ageGuidance.label}</h3>
+                <ul>
+                  <li><strong>Intensity:</strong> {ageGuidance.intensity}</li>
+                  <li><strong>Recovery:</strong> {ageGuidance.recovery}</li>
+                  <li><strong>Focus:</strong> {ageGuidance.focus}</li>
+                  <li><strong>Caution:</strong> {ageGuidance.caution}</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="weekly-plan-panel">
+              <div className="section-title">
+                <IonIcon icon={calendarOutline} />
+                <span>Weekly Split Plan</span>
+              </div>
+              <p className="weekly-plan-subtitle">{selectedWeeklyPlan.title}: {selectedWeeklyPlan.subtitle}</p>
+              <div className="week-grid">
+                {selectedWeeklyPlan.days.map(item => (
+                  <div key={`${item.day}-${item.workout}`} className="week-day-card">
+                    <div className="week-day-head">
+                      <span className="week-day-name">{item.day}</span>
+                      <span className="week-day-workout">{item.workout}</span>
+                    </div>
+                    <p className="week-day-note">{item.note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="exercise-grid">
-              {splitPlans[activeSplit].map(exercise => (
+              {splitPlans[difficulty][activeSplit].map(exercise => (
                 <div key={exercise.name} className="exercise-card">
                   <h3>{exercise.name}</h3>
                   <p className="exercise-target">Targets: {exercise.target}</p>
@@ -705,6 +1170,24 @@ const MuscleGainTracker: React.FC = () => {
                   <p className="exercise-description">{exercise.description}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="safety-panel">
+              <div className="section-title">
+                <IonIcon icon={warningOutline} />
+                <span>Safety Notes and Cautions</span>
+              </div>
+              <ul className="safety-list">
+                {sharedSafetyNotes.map(note => (
+                  <li key={note}>{note}</li>
+                ))}
+                {splitSpecificCautions[activeSplit].map(note => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+              <p className="medical-note">
+                If you feel dizziness, chest pain, sharp joint pain, or numbness, stop training immediately and seek medical help.
+              </p>
             </div>
           </div>
         </div>
