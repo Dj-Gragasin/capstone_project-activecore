@@ -234,7 +234,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 8px 8px 4px;
+  padding: 8px 8px 6px;
   margin-bottom: 10px;
 }
 
@@ -246,14 +246,15 @@
 
 .exercise-gif {
   width: 100%;
-  height: 132px;
-  object-fit: cover;
+  height: 210px;
+  object-fit: contain;
+  background: rgba(2, 6, 23, 0.55);
   border-radius: 8px;
   display: block;
 }
 
 .gif-placeholder {
-  height: 132px;
+  height: 210px;
   border-radius: 8px;
   border: 1px dashed rgba(103, 232, 249, 0.45);
   background: rgba(2, 6, 23, 0.35);
@@ -556,5 +557,10 @@
 
   .chart-container {
     height: 280px;
+  }
+
+  .exercise-gif,
+  .gif-placeholder {
+    height: 180px;
   }
 }
