@@ -47,6 +47,16 @@ import trapBarDeadliftGif from '../assets/workouts/trap-bar-deadlift.gif';
 import dumbbellRomanianDeadliftGif from '../assets/workouts/dumbbell-romanian-deadlift.gif';
 import legCurlGif from '../assets/workouts/leg-curl.gif';
 import standingCalfRaiseGif from '../assets/workouts/standing-calf-raise.gif';
+import dumbbellShoulderPressGif from '../assets/workouts/dumbbell-shoulder-press.gif';
+import cableLateralRaiseGif from '../assets/workouts/cable-lateral-raise.gif';
+import ropePushdownGif from '../assets/workouts/rope-pushdown.gif';
+import dumbbellRowGif from '../assets/workouts/dumbbell-row.gif';
+import tBarRowGif from '../assets/workouts/t-bar-row.gif';
+import inclineBarbellBenchPressGif from '../assets/workouts/incline-barbell-bench-press.gif';
+import closeGripBenchPressGif from '../assets/workouts/close-grip-bench-press.gif';
+import barbellRomanianDeadliftGif from '../assets/workouts/barbell-romdead.gif';
+import seatedLegCurl08Gif from '../assets/workouts/seated-leg-curl-08.gif';
+import dumbbellLateralRaiseGif from '../assets/workouts/dumbbell-lateral-raise.gif';
 
 const API_URL = API_CONFIG.BASE_URL;
 
@@ -353,28 +363,28 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Primary heavy press for strength-biased hypertrophy.',
       },
       {
-        name: 'Incline Barbell or Dumbbell Press',
+        name: 'Incline Barbell Press',
         target: 'Upper chest, front delts',
         sets: '4 sets',
         reps: '6–10 reps',
         description: 'Second compound press to drive upper-chest development.',
       },
       {
-        name: 'Overhead Press',
+        name: 'Standing Overhead Press (Barbell)',
         target: 'Shoulders, triceps',
         sets: '3–4 sets',
         reps: '6–10 reps',
         description: 'Vertical press for full shoulder and triceps output.',
       },
       {
-        name: 'Cable or Dumbbell Lateral Raise',
+        name: 'Cable Lateral Raise',
         target: 'Side delts',
         sets: '3–4 sets',
         reps: '12–20 reps',
         description: 'High-rep shoulder isolation to complement heavy pressing.',
       },
       {
-        name: 'Skullcrusher or Pushdown',
+        name: 'Close-Grip Bench Press',
         target: 'Triceps',
         sets: '3–4 sets',
         reps: '10–15 reps',
@@ -390,28 +400,28 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'High-demand pull reserved for advanced technique and recovery.',
       },
       {
-        name: 'Weighted Pull-Up or Lat Pulldown',
+        name: 'Weighted Pull-Up',
         target: 'Lats, upper back, biceps',
         sets: '4 sets',
         reps: '6–10 reps',
         description: 'Vertical pulling focus for width and upper-body strength.',
       },
       {
-        name: 'Barbell or Chest-Supported Row',
+        name: 'T-Bar Row',
         target: 'Mid-back, lats',
         sets: '4 sets',
         reps: '6–10 reps',
         description: 'Heavy horizontal pull to increase overall back density.',
       },
       {
-        name: 'Face Pull or Rear-Delt Fly',
+        name: 'Rear-Delt Cable Face Pull',
         target: 'Rear delts, rotator cuff',
         sets: '3 sets',
         reps: '12–20 reps',
         description: 'Shoulder prehab-style volume to balance pressing stress.',
       },
       {
-        name: 'Barbell or Incline Dumbbell Curl',
+        name: 'Incline Dumbbell Curl',
         target: 'Biceps, brachialis',
         sets: '3–4 sets',
         reps: '8–12 reps',
@@ -420,7 +430,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
     ],
     legs: [
       {
-        name: 'Back or Front Squat',
+        name: 'Back Squat (High-Bar)',
         target: 'Quads, glutes, core',
         sets: '4–5 sets',
         reps: '4–8 reps',
@@ -434,7 +444,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Posterior-chain loading to support leg and pull performance.',
       },
       {
-        name: 'Leg Press or Hack Squat',
+        name: 'Hack Squat (Machine)',
         target: 'Quads, glutes',
         sets: '3–4 sets',
         reps: '8–12 reps',
@@ -448,7 +458,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Isolation volume for hamstring size and knee resilience.',
       },
       {
-        name: 'Seated or Standing Calf Raise',
+        name: 'Standing Calf Raise',
         target: 'Calves',
         sets: '4 sets',
         reps: '10–15 reps',
@@ -599,6 +609,16 @@ const workoutGifFiles = {
   dumbbellRomanianDeadliftGif,
   legCurlGif,
   standingCalfRaiseGif,
+  dumbbellShoulderPressGif,
+  cableLateralRaiseGif,
+  ropePushdownGif,
+  dumbbellRowGif,
+  tBarRowGif,
+  inclineBarbellBenchPressGif,
+  closeGripBenchPressGif,
+  barbellRomanianDeadliftGif,
+  seatedLegCurl08Gif,
+  dumbbellLateralRaiseGif,
 };
 
 const workoutGif = (key: keyof typeof workoutGifFiles): string => workoutGifFiles[key];
@@ -682,10 +702,10 @@ const splitFieldConfigByDifficulty: Record<DifficultyKey, Record<SplitKey, Split
       description: 'Track heavy compounds and assistance volume.',
       fields: [
         { label: 'Bench Press (kg)', key: 'benchPress' },
-        { label: 'Incline Press (kg)', key: 'inclinePress' },
-        { label: 'Overhead Press (kg)', key: 'overheadPress' },
-        { label: 'Lateral Raise (kg)', key: 'lateralRaise' },
-        { label: 'Skullcrusher/Pushdown (kg)', key: 'tricepsIsolation' },
+        { label: 'Incline Barbell Press (kg)', key: 'inclineBarbellPress' },
+        { label: 'Standing OHP (kg)', key: 'standingOHP' },
+        { label: 'Cable Lateral Raise (kg)', key: 'cableLateralRaise' },
+        { label: 'Close-Grip Bench Press (kg)', key: 'closeGripBenchPress' },
       ],
     },
     pull: {
@@ -693,21 +713,21 @@ const splitFieldConfigByDifficulty: Record<DifficultyKey, Record<SplitKey, Split
       description: 'Track heavy pulls with shoulder-health accessories.',
       fields: [
         { label: 'Deadlift (kg)', key: 'deadlift' },
-        { label: 'Weighted Pull-Up / Pulldown (kg)', key: 'weightedPullupOrPulldown' },
-        { label: 'Barbell/Chest-Supported Row (kg)', key: 'barbellOrSupportedRow' },
-        { label: 'Face Pull / Rear-Delt Fly (kg)', key: 'rearDeltAccessory' },
-        { label: 'Barbell/Incline Curl (kg)', key: 'barbellOrInclineCurl' },
+        { label: 'Weighted Pull-Up (kg or assist)', key: 'weightedPullUp' },
+        { label: 'T-Bar Row (kg)', key: 'tBarRow' },
+        { label: 'Rear-Delt Cable Face Pull (kg)', key: 'rearDeltFacePull' },
+        { label: 'Incline Dumbbell Curl (kg)', key: 'inclineDbCurl' },
       ],
     },
     legs: {
       title: 'Leg Day (Advanced)',
       description: 'Capture strength-biased lower-body progression.',
       fields: [
-        { label: 'Back/Front Squat (kg)', key: 'backOrFrontSquat' },
-        { label: 'Romanian Deadlift (kg)', key: 'romanianDeadlift' },
-        { label: 'Leg Press/Hack Squat (kg)', key: 'legPressOrHackSquat' },
+        { label: 'Back Squat (High-Bar) (kg)', key: 'highBarBackSquat' },
+        { label: 'Barbell Romanian Deadlift (kg)', key: 'barbellRomanianDeadlift' },
+        { label: 'Hack Squat (Machine) (kg)', key: 'hackSquatMachine' },
         { label: 'Leg Curl (kg)', key: 'legCurl' },
-        { label: 'Calf Raise (kg)', key: 'calfRaise' },
+        { label: 'Standing Calf Raise (kg)', key: 'calfRaise' },
       ],
     },
   },
@@ -853,41 +873,41 @@ const splitGifFallback: Record<SplitKey, string> = {
 const exerciseGifMap: Record<string, string> = {
   'incline push-up': workoutGif('inclinePushUpGif'),
   'machine chest press': workoutGif('barbellBenchPressGif'),
-  'seated dumbbell shoulder press': workoutGif('barbellBenchPressGif'),
-  'lateral raise': workoutGif('inclineDumbbellPressGif'),
-  'rope triceps pushdown': workoutGif('barbellBenchPressGif'),
-  'triceps pushdown': workoutGif('barbellBenchPressGif'),
+  'seated dumbbell shoulder press': workoutGif('dumbbellShoulderPressGif'),
+  'lateral raise': workoutGif('dumbbellLateralRaiseGif'),
+  'rope triceps pushdown': workoutGif('ropePushdownGif'),
+  'triceps pushdown': workoutGif('ropePushdownGif'),
   'bench press': workoutGif('barbellBenchPressGif'),
   'bench press heavy day': workoutGif('barbellBenchPressGif'),
   'incline dumbbell press': workoutGif('inclineDumbbellPressGif'),
-  'incline barbell or dumbbell press': workoutGif('inclineDumbbellPressGif'),
-  'overhead press': workoutGif('barbellBenchPressGif'),
-  'cable or dumbbell lateral raise': workoutGif('inclineDumbbellPressGif'),
-  'skullcrusher or pushdown': workoutGif('barbellBenchPressGif'),
+  'incline barbell press': workoutGif('inclineBarbellBenchPressGif'),
+  'overhead press': workoutGif('dumbbellShoulderPressGif'),
+  'standing overhead press': workoutGif('dumbbellShoulderPressGif'),
+  'cable lateral raise': workoutGif('cableLateralRaiseGif'),
+  'close-grip bench press': workoutGif('closeGripBenchPressGif'),
   'lat pulldown': workoutGif('latPulldownGif'),
-  'chest-supported row': workoutGif('seatedCableRowGif'),
+  'weighted pull-up': workoutGif('latPulldownGif'),
+  'chest-supported row': workoutGif('dumbbellRowGif'),
   'seated cable row': workoutGif('seatedCableRowGif'),
   'face pull': workoutGif('facePullGif'),
   'dumbbell curl': workoutGif('dumbbellCurlGif'),
   'trap-bar deadlift': workoutGif('trapBarDeadliftGif'),
-  'barbell row': workoutGif('seatedCableRowGif'),
+  'barbell row': workoutGif('dumbbellRowGif'),
+  't-bar row': workoutGif('tBarRowGif'),
   'ez-bar curl': workoutGif('dumbbellCurlGif'),
   'conventional deadlift': workoutGif('trapBarDeadliftGif'),
-  'weighted pull-up or lat pulldown': workoutGif('latPulldownGif'),
-  'barbell or chest-supported row': workoutGif('seatedCableRowGif'),
-  'face pull or rear-delt fly': workoutGif('facePullGif'),
-  'barbell or incline dumbbell curl': workoutGif('dumbbellCurlGif'),
+  'rear-delt cable face pull': workoutGif('facePullGif'),
+  'incline dumbbell curl': workoutGif('dumbbellCurlGif'),
   'goblet squat': workoutGif('dumbbellRomanianDeadliftGif'),
-  'leg press': workoutGif('dumbbellRomanianDeadliftGif'),
+  'leg press': workoutGif('barbellRomanianDeadliftGif'),
   'dumbbell romanian deadlift': workoutGif('dumbbellRomanianDeadliftGif'),
-  'seated leg curl': workoutGif('legCurlGif'),
+  'seated leg curl': workoutGif('seatedLegCurl08Gif'),
   'standing calf raise': workoutGif('standingCalfRaiseGif'),
-  'back squat': workoutGif('dumbbellRomanianDeadliftGif'),
-  'romanian deadlift': workoutGif('dumbbellRomanianDeadliftGif'),
+  'back squat': workoutGif('barbellRomanianDeadliftGif'),
+  'back squat high-bar': workoutGif('barbellRomanianDeadliftGif'),
+  'romanian deadlift': workoutGif('barbellRomanianDeadliftGif'),
+  'hack squat machine': workoutGif('barbellRomanianDeadliftGif'),
   'leg curl': workoutGif('legCurlGif'),
-  'back or front squat': workoutGif('dumbbellRomanianDeadliftGif'),
-  'leg press or hack squat': workoutGif('dumbbellRomanianDeadliftGif'),
-  'seated or standing calf raise': workoutGif('standingCalfRaiseGif'),
 };
 
 const normalizeExerciseName = (name: string): string =>
@@ -947,7 +967,7 @@ const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = 
             type="button"
             onClick={() => {
               setHasFailed(false);
-              setImgSrc(splitGifFallback[split]);
+              setImgSrc(gifUrl);
             }}
           >
             Retry Demo
