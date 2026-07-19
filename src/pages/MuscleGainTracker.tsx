@@ -880,10 +880,57 @@ const getExerciseGifUrl = (exerciseName: string, split: SplitKey): string => {
 const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = ({ split, exerciseName }) => {
   const gifUrl = getExerciseGifUrl(exerciseName, split);
   const [imgSrc, setImgSrc] = useState(gifUrl);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const [hasFailed, setHasFailed] = useState(false);
 
   useEffect(() => {
     setImgSrc(gifUrl);
+    setShouldLoad(false);
+    setHasFailed(false);
   }, [gifUrl]);
+
+  const handleImageError = () => {
+    if (imgSrc !== splitGifFallback[split]) {
+      setImgSrc(splitGifFallback[split]);
+      return;
+    }
+    setHasFailed(true);
+  };
+
+  if (!shouldLoad) {
+    return (
+      <div className="motion-preview-wrap">
+        <div className="gif-placeholder">
+          <div className="gif-placeholder-title">{exerciseName} demo</div>
+          <button className="gif-load-btn" type="button" onClick={() => setShouldLoad(true)}>
+            Load Form Demo
+          </button>
+        </div>
+        <div className="motion-preview-legend">Tap to load GIF (saves data and improves speed)</div>
+      </div>
+    );
+  }
+
+  if (hasFailed) {
+    return (
+      <div className="motion-preview-wrap">
+        <div className="gif-placeholder">
+          <div className="gif-placeholder-title">Demo unavailable</div>
+          <button
+            className="gif-load-btn"
+            type="button"
+            onClick={() => {
+              setHasFailed(false);
+              setImgSrc(splitGifFallback[split]);
+            }}
+          >
+            Retry Demo
+          </button>
+        </div>
+        <div className="motion-preview-legend">Form demo GIF</div>
+      </div>
+    );
+  }
 
   return (
     <div className="motion-preview-wrap">
@@ -892,11 +939,7 @@ const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = 
         alt={`${exerciseName} demo`}
         className="exercise-gif"
         loading="lazy"
-        onError={() => {
-          if (imgSrc !== splitGifFallback[split]) {
-            setImgSrc(splitGifFallback[split]);
-          }
-        }}
+        onError={handleImageError}
       />
       <div className="motion-preview-legend">Form demo GIF</div>
     </div>
