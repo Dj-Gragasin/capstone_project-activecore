@@ -815,62 +815,71 @@ const splitFormVisualCues: Record<SplitKey, { setup: string; execute: string; fi
   },
 };
 
-const ExerciseMotionPreview: React.FC<{ split: SplitKey }> = ({ split }) => {
-  const push = (
-    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Push exercise motion preview">
-      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
-      <circle cx="60" cy="38" r="10" className="motion-body" />
-      <line x1="60" y1="48" x2="60" y2="78" className="motion-body" />
-      <line x1="60" y1="58" x2="40" y2="72" className="motion-body" />
-      <line x1="60" y1="58" x2="80" y2="72" className="motion-body" />
-      <line x1="60" y1="78" x2="45" y2="95" className="motion-body" />
-      <line x1="60" y1="78" x2="75" y2="95" className="motion-body" />
+const splitGifFallback: Record<SplitKey, string> = {
+  push: '/assets/workouts/push-up.gif',
+  pull: '/assets/workouts/lat-pulldown.gif',
+  legs: '/assets/workouts/dumbbell-romanian-deadlift.gif',
+};
 
-      <line x1="95" y1="62" x2="155" y2="62" className="motion-bar" />
-      <circle cx="95" cy="62" r="4" className="motion-plate" />
-      <circle cx="155" cy="62" r="4" className="motion-plate" />
-      <line x1="110" y1="24" x2="110" y2="78" className="motion-path" />
-    </svg>
-  );
+const exerciseGifMap: Record<string, string> = {
+  'incline push-up': '/assets/workouts/incline-push-up.gif',
+  'machine chest press': '/assets/workouts/barbell-bench-press.gif',
+  'seated dumbbell shoulder press': '/assets/workouts/barbell-bench-press.gif',
+  'lateral raise': '/assets/workouts/incline-dumbbell-press.gif',
+  'rope triceps pushdown': '/assets/workouts/barbell-bench-press.gif',
+  'triceps pushdown': '/assets/workouts/barbell-bench-press.gif',
+  'bench press': '/assets/workouts/barbell-bench-press.gif',
+  'bench press heavy day': '/assets/workouts/barbell-bench-press.gif',
+  'incline dumbbell press': '/assets/workouts/incline-dumbbell-press.gif',
+  'incline barbell or dumbbell press': '/assets/workouts/incline-dumbbell-press.gif',
+  'overhead press': '/assets/workouts/barbell-bench-press.gif',
+  'cable or dumbbell lateral raise': '/assets/workouts/incline-dumbbell-press.gif',
+  'skullcrusher or pushdown': '/assets/workouts/barbell-bench-press.gif',
+  'lat pulldown': '/assets/workouts/lat-pulldown.gif',
+  'chest-supported row': '/assets/workouts/seated-cable-row.gif',
+  'seated cable row': '/assets/workouts/seated-cable-row.gif',
+  'face pull': '/assets/workouts/face-pull.gif',
+  'dumbbell curl': '/assets/workouts/dumbbell-curl.gif',
+  'trap-bar deadlift': '/assets/workouts/trap-bar-deadlift.gif',
+  'barbell row': '/assets/workouts/seated-cable-row.gif',
+  'ez-bar curl': '/assets/workouts/dumbbell-curl.gif',
+  'conventional deadlift': '/assets/workouts/trap-bar-deadlift.gif',
+  'weighted pull-up or lat pulldown': '/assets/workouts/lat-pulldown.gif',
+  'barbell or chest-supported row': '/assets/workouts/seated-cable-row.gif',
+  'face pull or rear-delt fly': '/assets/workouts/face-pull.gif',
+  'barbell or incline dumbbell curl': '/assets/workouts/dumbbell-curl.gif',
+  'goblet squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'leg press': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'dumbbell romanian deadlift': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'seated leg curl': '/assets/workouts/leg-curl.gif',
+  'standing calf raise': '/assets/workouts/standing-calf-raise.gif',
+  'back squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'romanian deadlift': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'leg curl': '/assets/workouts/leg-curl.gif',
+  'back or front squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'leg press or hack squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  'seated or standing calf raise': '/assets/workouts/standing-calf-raise.gif',
+};
 
-  const pull = (
-    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Pull exercise motion preview">
-      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
-      <circle cx="60" cy="36" r="10" className="motion-body" />
-      <line x1="60" y1="46" x2="60" y2="80" className="motion-body" />
-      <line x1="60" y1="58" x2="45" y2="72" className="motion-body" />
-      <line x1="60" y1="58" x2="82" y2="66" className="motion-body" />
-      <line x1="60" y1="80" x2="45" y2="95" className="motion-body" />
-      <line x1="60" y1="80" x2="75" y2="95" className="motion-body" />
+const normalizeExerciseName = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/[\/]/g, ' or ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-      <line x1="132" y1="65" x2="178" y2="65" className="motion-bar pull-bar" />
-      <circle cx="132" cy="65" r="4" className="motion-plate" />
-      <circle cx="178" cy="65" r="4" className="motion-plate" />
-      <line x1="86" y1="65" x2="172" y2="65" className="motion-path" />
-    </svg>
-  );
+const getExerciseGifUrl = (exerciseName: string, split: SplitKey): string => {
+  const normalized = normalizeExerciseName(exerciseName);
+  return exerciseGifMap[normalized] || splitGifFallback[split];
+};
 
-  const legs = (
-    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Leg exercise motion preview">
-      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
-      <circle cx="80" cy="30" r="10" className="motion-body" />
-      <line x1="80" y1="40" x2="80" y2="74" className="motion-body torso-pulse" />
-      <line x1="80" y1="54" x2="62" y2="66" className="motion-body" />
-      <line x1="80" y1="54" x2="98" y2="66" className="motion-body" />
-      <line x1="80" y1="74" x2="63" y2="95" className="motion-body" />
-      <line x1="80" y1="74" x2="98" y2="95" className="motion-body" />
-
-      <line x1="124" y1="24" x2="170" y2="24" className="motion-bar" />
-      <circle cx="124" cy="24" r="4" className="motion-plate" />
-      <circle cx="170" cy="24" r="4" className="motion-plate" />
-      <line x1="147" y1="16" x2="147" y2="40" className="motion-path" />
-    </svg>
-  );
-
+const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = ({ split, exerciseName }) => {
+  const gifUrl = getExerciseGifUrl(exerciseName, split);
   return (
     <div className="motion-preview-wrap">
-      {split === 'push' ? push : split === 'pull' ? pull : legs}
-      <div className="motion-preview-legend">Animated form preview</div>
+      <img src={gifUrl} alt={`${exerciseName} demo`} className="exercise-gif" loading="lazy" />
+      <div className="motion-preview-legend">Form demo GIF</div>
     </div>
   );
 };
@@ -1319,7 +1328,7 @@ const MuscleGainTracker: React.FC = () => {
             <div className="exercise-grid">
               {splitPlans[difficulty][activeSplit].map(exercise => (
                 <div key={exercise.name} className="exercise-card">
-                  <ExerciseMotionPreview split={activeSplit} />
+                  <ExerciseGifPreview split={activeSplit} exerciseName={exercise.name} />
                   <h3>{exercise.name}</h3>
                   <p className="exercise-target">Targets: {exercise.target}</p>
                   <div className="exercise-meta">
