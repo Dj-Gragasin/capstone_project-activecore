@@ -230,6 +230,65 @@
   padding: 14px;
 }
 
+.motion-preview-wrap {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 8px 4px;
+  margin-bottom: 10px;
+}
+
+.motion-svg {
+  width: 100%;
+  height: 112px;
+  display: block;
+}
+
+.motion-ground {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 2;
+}
+
+.motion-body {
+  stroke: #67e8f9;
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.motion-bar {
+  stroke: #f5f7fb;
+  stroke-width: 4;
+  stroke-linecap: round;
+  animation: barPulseY 1.6s ease-in-out infinite;
+}
+
+.pull-bar {
+  animation: barPulseX 1.6s ease-in-out infinite;
+}
+
+.motion-plate {
+  fill: #f59e0b;
+  animation: platePulse 1.6s ease-in-out infinite;
+}
+
+.motion-path {
+  stroke: rgba(245, 158, 11, 0.8);
+  stroke-dasharray: 5 4;
+  stroke-width: 2;
+}
+
+.torso-pulse {
+  animation: torsoPulse 1.6s ease-in-out infinite;
+}
+
+.motion-preview-legend {
+  text-align: right;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
 .exercise-card h3 {
   margin: 0 0 6px;
   font-size: 1rem;
@@ -259,6 +318,63 @@
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.4;
+}
+
+.form-cues {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.form-cue-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.form-cue-row ion-icon {
+  color: #67e8f9;
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+
+@keyframes barPulseY {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes barPulseX {
+  0%, 100% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes platePulse {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes torsoPulse {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
 }
 
 .safety-panel {
