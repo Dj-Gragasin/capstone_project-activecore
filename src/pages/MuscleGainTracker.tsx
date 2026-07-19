@@ -20,7 +20,7 @@ import {
   IonRow,
   IonCol,
 } from '@ionic/react';
-import { barbell, analytics, calendarOutline, warningOutline, personOutline } from 'ionicons/icons';
+import { barbell, analytics, calendarOutline, warningOutline, personOutline, checkmarkCircle } from 'ionicons/icons';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -797,6 +797,84 @@ const getAgeBand = (age: number | null): AgeBand => {
   return '55plus';
 };
 
+const splitFormVisualCues: Record<SplitKey, { setup: string; execute: string; finish: string }> = {
+  push: {
+    setup: 'Shoulders packed, wrists stacked over elbows, feet planted.',
+    execute: 'Press in a controlled path; avoid shoulder shrugging and elbow flare.',
+    finish: 'Lock out softly with core tight and chest up.',
+  },
+  pull: {
+    setup: 'Brace core and set a neutral spine before every pull.',
+    execute: 'Drive elbows back and keep load close to your body.',
+    finish: 'Squeeze upper back without excessive neck extension.',
+  },
+  legs: {
+    setup: 'Tripod foot pressure and knees tracking with toes.',
+    execute: 'Control depth, keep chest proud, and maintain spinal neutrality.',
+    finish: 'Stand tall by driving through mid-foot and heels.',
+  },
+};
+
+const ExerciseMotionPreview: React.FC<{ split: SplitKey }> = ({ split }) => {
+  const push = (
+    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Push exercise motion preview">
+      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
+      <circle cx="60" cy="38" r="10" className="motion-body" />
+      <line x1="60" y1="48" x2="60" y2="78" className="motion-body" />
+      <line x1="60" y1="58" x2="40" y2="72" className="motion-body" />
+      <line x1="60" y1="58" x2="80" y2="72" className="motion-body" />
+      <line x1="60" y1="78" x2="45" y2="95" className="motion-body" />
+      <line x1="60" y1="78" x2="75" y2="95" className="motion-body" />
+
+      <line x1="95" y1="62" x2="155" y2="62" className="motion-bar" />
+      <circle cx="95" cy="62" r="4" className="motion-plate" />
+      <circle cx="155" cy="62" r="4" className="motion-plate" />
+      <line x1="110" y1="24" x2="110" y2="78" className="motion-path" />
+    </svg>
+  );
+
+  const pull = (
+    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Pull exercise motion preview">
+      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
+      <circle cx="60" cy="36" r="10" className="motion-body" />
+      <line x1="60" y1="46" x2="60" y2="80" className="motion-body" />
+      <line x1="60" y1="58" x2="45" y2="72" className="motion-body" />
+      <line x1="60" y1="58" x2="82" y2="66" className="motion-body" />
+      <line x1="60" y1="80" x2="45" y2="95" className="motion-body" />
+      <line x1="60" y1="80" x2="75" y2="95" className="motion-body" />
+
+      <line x1="132" y1="65" x2="178" y2="65" className="motion-bar pull-bar" />
+      <circle cx="132" cy="65" r="4" className="motion-plate" />
+      <circle cx="178" cy="65" r="4" className="motion-plate" />
+      <line x1="86" y1="65" x2="172" y2="65" className="motion-path" />
+    </svg>
+  );
+
+  const legs = (
+    <svg viewBox="0 0 220 110" className="motion-svg" role="img" aria-label="Leg exercise motion preview">
+      <line x1="25" y1="95" x2="195" y2="95" className="motion-ground" />
+      <circle cx="80" cy="30" r="10" className="motion-body" />
+      <line x1="80" y1="40" x2="80" y2="74" className="motion-body torso-pulse" />
+      <line x1="80" y1="54" x2="62" y2="66" className="motion-body" />
+      <line x1="80" y1="54" x2="98" y2="66" className="motion-body" />
+      <line x1="80" y1="74" x2="63" y2="95" className="motion-body" />
+      <line x1="80" y1="74" x2="98" y2="95" className="motion-body" />
+
+      <line x1="124" y1="24" x2="170" y2="24" className="motion-bar" />
+      <circle cx="124" cy="24" r="4" className="motion-plate" />
+      <circle cx="170" cy="24" r="4" className="motion-plate" />
+      <line x1="147" y1="16" x2="147" y2="40" className="motion-path" />
+    </svg>
+  );
+
+  return (
+    <div className="motion-preview-wrap">
+      {split === 'push' ? push : split === 'pull' ? pull : legs}
+      <div className="motion-preview-legend">Animated form preview</div>
+    </div>
+  );
+};
+
 const MuscleGainTracker: React.FC = () => {
   const [records, setRecords] = useState<MuscleGainRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1241,6 +1319,7 @@ const MuscleGainTracker: React.FC = () => {
             <div className="exercise-grid">
               {splitPlans[difficulty][activeSplit].map(exercise => (
                 <div key={exercise.name} className="exercise-card">
+                  <ExerciseMotionPreview split={activeSplit} />
                   <h3>{exercise.name}</h3>
                   <p className="exercise-target">Targets: {exercise.target}</p>
                   <div className="exercise-meta">
@@ -1248,6 +1327,20 @@ const MuscleGainTracker: React.FC = () => {
                     <span>{exercise.reps}</span>
                   </div>
                   <p className="exercise-description">{exercise.description}</p>
+                  <div className="form-cues">
+                    <div className="form-cue-row">
+                      <IonIcon icon={checkmarkCircle} />
+                      <span><strong>Setup:</strong> {splitFormVisualCues[activeSplit].setup}</span>
+                    </div>
+                    <div className="form-cue-row">
+                      <IonIcon icon={checkmarkCircle} />
+                      <span><strong>Movement:</strong> {splitFormVisualCues[activeSplit].execute}</span>
+                    </div>
+                    <div className="form-cue-row">
+                      <IonIcon icon={checkmarkCircle} />
+                      <span><strong>Finish:</strong> {splitFormVisualCues[activeSplit].finish}</span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
