@@ -574,6 +574,9 @@ const splitSpecificCautions: Record<SplitKey, string[]> = {
   ],
 };
 
+const publicBasePath = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+const workoutGif = (fileName: string): string => `${publicBasePath}/assets/workouts/${fileName}`;
+
 const splitFieldConfig: Record<SplitKey, SplitFieldConfig> = {
   push: {
     title: 'Push Day',
@@ -816,49 +819,49 @@ const splitFormVisualCues: Record<SplitKey, { setup: string; execute: string; fi
 };
 
 const splitGifFallback: Record<SplitKey, string> = {
-  push: '/assets/workouts/push-up.gif',
-  pull: '/assets/workouts/lat-pulldown.gif',
-  legs: '/assets/workouts/dumbbell-romanian-deadlift.gif',
+  push: workoutGif('push-up.gif'),
+  pull: workoutGif('lat-pulldown.gif'),
+  legs: workoutGif('dumbbell-romanian-deadlift.gif'),
 };
 
 const exerciseGifMap: Record<string, string> = {
-  'incline push-up': '/assets/workouts/incline-push-up.gif',
-  'machine chest press': '/assets/workouts/barbell-bench-press.gif',
-  'seated dumbbell shoulder press': '/assets/workouts/barbell-bench-press.gif',
-  'lateral raise': '/assets/workouts/incline-dumbbell-press.gif',
-  'rope triceps pushdown': '/assets/workouts/barbell-bench-press.gif',
-  'triceps pushdown': '/assets/workouts/barbell-bench-press.gif',
-  'bench press': '/assets/workouts/barbell-bench-press.gif',
-  'bench press heavy day': '/assets/workouts/barbell-bench-press.gif',
-  'incline dumbbell press': '/assets/workouts/incline-dumbbell-press.gif',
-  'incline barbell or dumbbell press': '/assets/workouts/incline-dumbbell-press.gif',
-  'overhead press': '/assets/workouts/barbell-bench-press.gif',
-  'cable or dumbbell lateral raise': '/assets/workouts/incline-dumbbell-press.gif',
-  'skullcrusher or pushdown': '/assets/workouts/barbell-bench-press.gif',
-  'lat pulldown': '/assets/workouts/lat-pulldown.gif',
-  'chest-supported row': '/assets/workouts/seated-cable-row.gif',
-  'seated cable row': '/assets/workouts/seated-cable-row.gif',
-  'face pull': '/assets/workouts/face-pull.gif',
-  'dumbbell curl': '/assets/workouts/dumbbell-curl.gif',
-  'trap-bar deadlift': '/assets/workouts/trap-bar-deadlift.gif',
-  'barbell row': '/assets/workouts/seated-cable-row.gif',
-  'ez-bar curl': '/assets/workouts/dumbbell-curl.gif',
-  'conventional deadlift': '/assets/workouts/trap-bar-deadlift.gif',
-  'weighted pull-up or lat pulldown': '/assets/workouts/lat-pulldown.gif',
-  'barbell or chest-supported row': '/assets/workouts/seated-cable-row.gif',
-  'face pull or rear-delt fly': '/assets/workouts/face-pull.gif',
-  'barbell or incline dumbbell curl': '/assets/workouts/dumbbell-curl.gif',
-  'goblet squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'leg press': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'dumbbell romanian deadlift': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'seated leg curl': '/assets/workouts/leg-curl.gif',
-  'standing calf raise': '/assets/workouts/standing-calf-raise.gif',
-  'back squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'romanian deadlift': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'leg curl': '/assets/workouts/leg-curl.gif',
-  'back or front squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'leg press or hack squat': '/assets/workouts/dumbbell-romanian-deadlift.gif',
-  'seated or standing calf raise': '/assets/workouts/standing-calf-raise.gif',
+  'incline push-up': workoutGif('incline-push-up.gif'),
+  'machine chest press': workoutGif('barbell-bench-press.gif'),
+  'seated dumbbell shoulder press': workoutGif('barbell-bench-press.gif'),
+  'lateral raise': workoutGif('incline-dumbbell-press.gif'),
+  'rope triceps pushdown': workoutGif('barbell-bench-press.gif'),
+  'triceps pushdown': workoutGif('barbell-bench-press.gif'),
+  'bench press': workoutGif('barbell-bench-press.gif'),
+  'bench press heavy day': workoutGif('barbell-bench-press.gif'),
+  'incline dumbbell press': workoutGif('incline-dumbbell-press.gif'),
+  'incline barbell or dumbbell press': workoutGif('incline-dumbbell-press.gif'),
+  'overhead press': workoutGif('barbell-bench-press.gif'),
+  'cable or dumbbell lateral raise': workoutGif('incline-dumbbell-press.gif'),
+  'skullcrusher or pushdown': workoutGif('barbell-bench-press.gif'),
+  'lat pulldown': workoutGif('lat-pulldown.gif'),
+  'chest-supported row': workoutGif('seated-cable-row.gif'),
+  'seated cable row': workoutGif('seated-cable-row.gif'),
+  'face pull': workoutGif('face-pull.gif'),
+  'dumbbell curl': workoutGif('dumbbell-curl.gif'),
+  'trap-bar deadlift': workoutGif('trap-bar-deadlift.gif'),
+  'barbell row': workoutGif('seated-cable-row.gif'),
+  'ez-bar curl': workoutGif('dumbbell-curl.gif'),
+  'conventional deadlift': workoutGif('trap-bar-deadlift.gif'),
+  'weighted pull-up or lat pulldown': workoutGif('lat-pulldown.gif'),
+  'barbell or chest-supported row': workoutGif('seated-cable-row.gif'),
+  'face pull or rear-delt fly': workoutGif('face-pull.gif'),
+  'barbell or incline dumbbell curl': workoutGif('dumbbell-curl.gif'),
+  'goblet squat': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'leg press': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'dumbbell romanian deadlift': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'seated leg curl': workoutGif('leg-curl.gif'),
+  'standing calf raise': workoutGif('standing-calf-raise.gif'),
+  'back squat': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'romanian deadlift': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'leg curl': workoutGif('leg-curl.gif'),
+  'back or front squat': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'leg press or hack squat': workoutGif('dumbbell-romanian-deadlift.gif'),
+  'seated or standing calf raise': workoutGif('standing-calf-raise.gif'),
 };
 
 const normalizeExerciseName = (name: string): string =>
@@ -876,9 +879,25 @@ const getExerciseGifUrl = (exerciseName: string, split: SplitKey): string => {
 
 const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = ({ split, exerciseName }) => {
   const gifUrl = getExerciseGifUrl(exerciseName, split);
+  const [imgSrc, setImgSrc] = useState(gifUrl);
+
+  useEffect(() => {
+    setImgSrc(gifUrl);
+  }, [gifUrl]);
+
   return (
     <div className="motion-preview-wrap">
-      <img src={gifUrl} alt={`${exerciseName} demo`} className="exercise-gif" loading="lazy" />
+      <img
+        src={imgSrc}
+        alt={`${exerciseName} demo`}
+        className="exercise-gif"
+        loading="lazy"
+        onError={() => {
+          if (imgSrc !== splitGifFallback[split]) {
+            setImgSrc(splitGifFallback[split]);
+          }
+        }}
+      />
       <div className="motion-preview-legend">Form demo GIF</div>
     </div>
   );
