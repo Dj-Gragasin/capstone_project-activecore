@@ -142,7 +142,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Build pressing mechanics safely before moving to heavy barbell work.',
       },
       {
-        name: 'Machine Chest Press',
+        name: 'Lying Chest Press (Machine)',
         target: 'Chest, front delts, triceps',
         sets: '3 sets',
         reps: '10–12 reps',
@@ -701,7 +701,7 @@ const splitFieldConfigByDifficulty: Record<DifficultyKey, Record<SplitKey, Split
       description: 'Use beginner-safe movements and controlled reps.',
       fields: [
         { label: 'Incline Push-Up (reps)', key: 'inclinePushupReps' },
-        { label: 'Machine Chest Press (kg)', key: 'machineChestPress' },
+        { label: 'Lying Chest Press (Machine) (kg)', key: 'machineChestPress' },
         { label: 'Seated DB Shoulder Press (kg)', key: 'seatedDbShoulderPress' },
         { label: 'Lateral Raise (kg)', key: 'lateralRaise' },
         { label: 'Rope Triceps Pushdown (kg)', key: 'ropeTricepsPushdown' },
@@ -908,6 +908,7 @@ const splitGifFallback: Record<SplitKey, string> = {
 const exerciseGifMap: Record<string, string> = {
   'incline push-up': workoutGif('inclinePushUpGif'),
   'machine chest press': workoutGif('barbellBenchPressGif'),
+  'lying chest press': 'https://fitnessprogramer.com/wp-content/uploads/2021/08/Lying-Chest-Press-Machine.gif',
   'seated dumbbell shoulder press': workoutGif('dumbbellShoulderPressGif'),
   'lateral raise': workoutGif('dumbbellLateralRaiseGif'),
   'dumbbell lateral raise': workoutGif('dumbbellLateralRaiseGif'),
@@ -954,6 +955,194 @@ const exerciseGifMap: Record<string, string> = {
   'leg curl': workoutGif('legCurlGif'),
 };
 
+const recommendedKgByExercise: Record<string, Record<DifficultyKey, string>> = {
+  'incline push-up': {
+    beginner: 'Bodyweight incline setup',
+    intermediate: 'Bodyweight (add 5-15 kg vest if easy)',
+    advanced: 'Bodyweight (add 10-30 kg vest/plate)',
+  },
+  'lying chest press': {
+    beginner: '15-35 kg',
+    intermediate: '35-60 kg',
+    advanced: '60-100 kg',
+  },
+  'seated dumbbell shoulder press': {
+    beginner: '4-10 kg each dumbbell',
+    intermediate: '10-20 kg each dumbbell',
+    advanced: '18-32 kg each dumbbell',
+  },
+  'dumbbell lateral raise': {
+    beginner: '2-6 kg each dumbbell',
+    intermediate: '6-12 kg each dumbbell',
+    advanced: '10-18 kg each dumbbell',
+  },
+  'rope triceps pushdown': {
+    beginner: '10-20 kg',
+    intermediate: '20-35 kg',
+    advanced: '30-50 kg',
+  },
+  'triceps pushdown': {
+    beginner: '10-20 kg',
+    intermediate: '20-35 kg',
+    advanced: '30-50 kg',
+  },
+  'bench press': {
+    beginner: '20-40 kg',
+    intermediate: '40-75 kg',
+    advanced: '70-120 kg',
+  },
+  'bench press heavy day': {
+    beginner: '20-40 kg',
+    intermediate: '45-80 kg',
+    advanced: '80-130 kg',
+  },
+  'incline dumbbell press': {
+    beginner: '6-12 kg each dumbbell',
+    intermediate: '12-24 kg each dumbbell',
+    advanced: '22-38 kg each dumbbell',
+  },
+  'incline barbell press': {
+    beginner: '20-35 kg',
+    intermediate: '35-65 kg',
+    advanced: '60-100 kg',
+  },
+  'dumbbell overhead press': {
+    beginner: '4-10 kg each dumbbell',
+    intermediate: '10-18 kg each dumbbell',
+    advanced: '16-28 kg each dumbbell',
+  },
+  'barbell-close-grip-military-press': {
+    beginner: '20-30 kg',
+    intermediate: '30-55 kg',
+    advanced: '50-85 kg',
+  },
+  'cable lateral raise': {
+    beginner: '2.5-7.5 kg per side',
+    intermediate: '5-12.5 kg per side',
+    advanced: '10-20 kg per side',
+  },
+  'close-grip bench press': {
+    beginner: '20-35 kg',
+    intermediate: '35-70 kg',
+    advanced: '65-110 kg',
+  },
+  'lat pulldown': {
+    beginner: '20-35 kg',
+    intermediate: '35-60 kg',
+    advanced: '55-90 kg',
+  },
+  'chest supported dumbbell row': {
+    beginner: '6-12 kg each dumbbell',
+    intermediate: '12-22 kg each dumbbell',
+    advanced: '20-34 kg each dumbbell',
+  },
+  'seated cable row': {
+    beginner: '20-35 kg',
+    intermediate: '35-60 kg',
+    advanced: '55-90 kg',
+  },
+  'face pull': {
+    beginner: '7.5-15 kg',
+    intermediate: '15-27.5 kg',
+    advanced: '25-40 kg',
+  },
+  'dumbbell curl': {
+    beginner: '4-10 kg each dumbbell',
+    intermediate: '8-16 kg each dumbbell',
+    advanced: '14-24 kg each dumbbell',
+  },
+  'trap-bar deadlift': {
+    beginner: '30-60 kg',
+    intermediate: '60-110 kg',
+    advanced: '100-180 kg',
+  },
+  'incline barbell row': {
+    beginner: '20-35 kg',
+    intermediate: '35-65 kg',
+    advanced: '60-100 kg',
+  },
+  'reverse grip ez-bar curl': {
+    beginner: '10-20 kg',
+    intermediate: '20-35 kg',
+    advanced: '30-50 kg',
+  },
+  'conventional deadlift': {
+    beginner: '40-70 kg',
+    intermediate: '70-130 kg',
+    advanced: '120-220 kg',
+  },
+  'weighted pull-up': {
+    beginner: 'Bodyweight or assisted setup',
+    intermediate: 'Bodyweight +0 to +15 kg',
+    advanced: 'Bodyweight +15 to +40 kg',
+  },
+  't-bar row': {
+    beginner: '20-35 kg',
+    intermediate: '35-70 kg',
+    advanced: '65-110 kg',
+  },
+  'rear-delt cable face pull': {
+    beginner: '7.5-15 kg',
+    intermediate: '15-27.5 kg',
+    advanced: '25-40 kg',
+  },
+  'seated incline dumbbell curl': {
+    beginner: '4-8 kg each dumbbell',
+    intermediate: '8-14 kg each dumbbell',
+    advanced: '12-20 kg each dumbbell',
+  },
+  'dumbbell goblet squat': {
+    beginner: '8-20 kg dumbbell',
+    intermediate: '20-36 kg dumbbell',
+    advanced: '32-50 kg dumbbell',
+  },
+  'barbell squat': {
+    beginner: '20-40 kg',
+    intermediate: '40-90 kg',
+    advanced: '85-150 kg',
+  },
+  'back squat high-bar': {
+    beginner: '20-40 kg',
+    intermediate: '45-95 kg',
+    advanced: '90-160 kg',
+  },
+  'romanian deadlift': {
+    beginner: '20-45 kg',
+    intermediate: '45-85 kg',
+    advanced: '80-140 kg',
+  },
+  'dumbbell romanian deadlift': {
+    beginner: '6-14 kg each dumbbell',
+    intermediate: '14-26 kg each dumbbell',
+    advanced: '24-40 kg each dumbbell',
+  },
+  'leg press': {
+    beginner: '40-90 kg',
+    intermediate: '90-180 kg',
+    advanced: '170-320 kg',
+  },
+  'hack squat machine': {
+    beginner: '20-50 kg',
+    intermediate: '50-110 kg',
+    advanced: '100-200 kg',
+  },
+  'seated leg curl': {
+    beginner: '15-30 kg',
+    intermediate: '30-50 kg',
+    advanced: '45-75 kg',
+  },
+  'leg curl': {
+    beginner: '15-30 kg',
+    intermediate: '30-50 kg',
+    advanced: '45-75 kg',
+  },
+  'standing calf raise': {
+    beginner: '20-45 kg',
+    intermediate: '45-90 kg',
+    advanced: '80-150 kg',
+  },
+};
+
 const normalizeExerciseName = (name: string): string =>
   name
     .toLowerCase()
@@ -965,6 +1154,11 @@ const normalizeExerciseName = (name: string): string =>
 const getExerciseGifUrl = (exerciseName: string, split: SplitKey): string => {
   const normalized = normalizeExerciseName(exerciseName);
   return exerciseGifMap[normalized] || splitGifFallback[split];
+};
+
+const getRecommendedLoad = (exerciseName: string, difficulty: DifficultyKey): string => {
+  const normalized = normalizeExerciseName(exerciseName);
+  return recommendedKgByExercise[normalized]?.[difficulty] || 'Use a load that leaves 1-3 reps in reserve.';
 };
 
 const ExerciseGifPreview: React.FC<{ split: SplitKey; exerciseName: string }> = ({ split, exerciseName }) => {
@@ -1519,6 +1713,7 @@ const MuscleGainTracker: React.FC = () => {
                     <span>{exercise.sets}</span>
                     <span>{exercise.reps}</span>
                   </div>
+                  <p className="exercise-target">Recommended Load: {getRecommendedLoad(exercise.name, difficulty)}</p>
                   <p className="exercise-description">{exercise.description}</p>
                   <div className="form-cues">
                     <div className="form-cue-row">
