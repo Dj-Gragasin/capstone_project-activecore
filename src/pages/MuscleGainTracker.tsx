@@ -100,6 +100,11 @@ interface WeeklySplitPlan {
   title: string;
   subtitle: string;
   days: WeeklySplitDay[];
+  variants?: Array<{
+    title: string;
+    subtitle: string;
+    days: WeeklySplitDay[];
+  }>;
 }
 
 interface AgeGuidance {
@@ -151,7 +156,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Safer shoulder-friendly press with manageable loading.',
       },
       {
-        name: 'Lateral Raise',
+        name: 'Dumbbell Lateral Raise',
         target: 'Side delts',
         sets: '2–3 sets',
         reps: '12–15 reps',
@@ -174,7 +179,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Foundational vertical pull that builds back strength with less risk.',
       },
       {
-        name: 'Chest-Supported Row',
+        name: 'Chest Supported Dumbbell Row',
         target: 'Upper back, lats',
         sets: '3 sets',
         reps: '10–12 reps',
@@ -204,7 +209,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
     ],
     legs: [
       {
-        name: 'Goblet Squat',
+        name: 'Dumbbell Goblet Squat',
         target: 'Quads, glutes, core',
         sets: '3 sets',
         reps: '10–12 reps',
@@ -257,14 +262,14 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Improves upper-chest development and pressing balance.',
       },
       {
-        name: 'Overhead Press',
+        name: 'Dumbbell Overhead Press',
         target: 'Shoulders, triceps',
         sets: '3 sets',
         reps: '8–10 reps',
         description: 'Builds vertical pressing strength with strict technique.',
       },
       {
-        name: 'Lateral Raise',
+        name: 'Dumbbell Lateral Raise',
         target: 'Side delts',
         sets: '3 sets',
         reps: '12–15 reps',
@@ -287,7 +292,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Intermediate-friendly deadlift variation with cleaner mechanics.',
       },
       {
-        name: 'Barbell Row',
+        name: 'Incline Barbell Row',
         target: 'Upper back, lats',
         sets: '3 sets',
         reps: '8–10 reps',
@@ -308,7 +313,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Supports shoulder integrity and posture under higher volumes.',
       },
       {
-        name: 'EZ-Bar Curl',
+        name: 'Reverse Grip EZ-Bar Curl',
         target: 'Biceps, forearms',
         sets: '3 sets',
         reps: '10–12 reps',
@@ -317,7 +322,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
     ],
     legs: [
       {
-        name: 'Back Squat',
+        name: 'Barbell Squat',
         target: 'Quads, glutes, core',
         sets: '3–4 sets',
         reps: '6–10 reps',
@@ -370,7 +375,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Second compound press to drive upper-chest development.',
       },
       {
-        name: 'Standing Overhead Press (Barbell)',
+        name: 'Barbell-Close-Grip-Military-Press',
         target: 'Shoulders, triceps',
         sets: '3–4 sets',
         reps: '6–10 reps',
@@ -421,7 +426,7 @@ const splitPlans: Record<DifficultyKey, Record<SplitKey, ExerciseItem[]>> = {
         description: 'Shoulder prehab-style volume to balance pressing stress.',
       },
       {
-        name: 'Incline Dumbbell Curl',
+        name: 'Seated Incline Dumbbell Curl',
         target: 'Biceps, brachialis',
         sets: '3–4 sets',
         reps: '8–12 reps',
@@ -518,6 +523,21 @@ const weeklySplitPlans: Record<DifficultyKey, WeeklySplitPlan> = {
       { day: 'Sat', workout: 'Pull (Volume)', note: 'Back and arm volume, avoid max efforts.' },
       { day: 'Sun', workout: 'Full Rest', note: 'Next week starts with Legs for balance.' },
     ],
+    variants: [
+      {
+        title: '4-Day Variant',
+        subtitle: 'Lower weekly frequency while keeping progression on core lifts.',
+        days: [
+          { day: 'Mon', workout: 'Push', note: 'Main pressing compounds and triceps.' },
+          { day: 'Tue', workout: 'Pull', note: 'Rows, pulldowns, and biceps accessories.' },
+          { day: 'Wed', workout: 'Recovery', note: 'Mobility, light cardio, and sleep focus.' },
+          { day: 'Thu', workout: 'Legs', note: 'Squat and hinge emphasis with controlled volume.' },
+          { day: 'Fri', workout: 'Upper (Volume)', note: 'Lighter upper-body pump and technique work.' },
+          { day: 'Sat', workout: 'Active Rest', note: 'Walk, stretch, and optional core work.' },
+          { day: 'Sun', workout: 'Full Rest', note: 'Prepare for next training week.' },
+        ],
+      },
+    ],
   },
   advanced: {
     title: '6-Day PPL x2 Split',
@@ -530,6 +550,21 @@ const weeklySplitPlans: Record<DifficultyKey, WeeklySplitPlan> = {
       { day: 'Fri', workout: 'Pull B', note: 'Horizontal/vertical pull balance and arms.' },
       { day: 'Sat', workout: 'Legs B', note: 'Volume-focused lower-body session.' },
       { day: 'Sun', workout: 'Full Rest', note: 'Recovery check before next cycle.' },
+    ],
+    variants: [
+      {
+        title: '6-Day Variant (PPL Rest PPL Legs)',
+        subtitle: 'Push-Pull-Legs, midweek rest, then Push-Pull-Legs to finish the week.',
+        days: [
+          { day: 'Mon', workout: 'Push', note: 'Heavy compounds and accessory pressing.' },
+          { day: 'Tue', workout: 'Pull', note: 'Back thickness and vertical pull work.' },
+          { day: 'Wed', workout: 'Legs', note: 'Strength-focused squat and posterior chain.' },
+          { day: 'Thu', workout: 'Rest', note: 'Full recovery and mobility only.' },
+          { day: 'Fri', workout: 'Push', note: 'Moderate load, controlled volume.' },
+          { day: 'Sat', workout: 'Pull', note: 'Row/pulldown volume and arm finishers.' },
+          { day: 'Sun', workout: 'Legs', note: 'Volume-biased lower-body work and calves.' },
+        ],
+      },
     ],
   },
 };
@@ -875,6 +910,7 @@ const exerciseGifMap: Record<string, string> = {
   'machine chest press': workoutGif('barbellBenchPressGif'),
   'seated dumbbell shoulder press': workoutGif('dumbbellShoulderPressGif'),
   'lateral raise': workoutGif('dumbbellLateralRaiseGif'),
+  'dumbbell lateral raise': workoutGif('dumbbellLateralRaiseGif'),
   'rope triceps pushdown': workoutGif('ropePushdownGif'),
   'triceps pushdown': workoutGif('ropePushdownGif'),
   'bench press': workoutGif('barbellBenchPressGif'),
@@ -882,31 +918,39 @@ const exerciseGifMap: Record<string, string> = {
   'incline dumbbell press': workoutGif('inclineDumbbellPressGif'),
   'incline barbell press': workoutGif('inclineBarbellBenchPressGif'),
   'overhead press': workoutGif('dumbbellShoulderPressGif'),
+  'dumbbell overhead press': workoutGif('dumbbellShoulderPressGif'),
   'standing overhead press': workoutGif('dumbbellShoulderPressGif'),
+  'barbell-close-grip-military-press': 'https://fitnessprogramer.com/wp-content/uploads/2021/10/Standing-Barbell-Close-Grip-Military-Press.gif',
   'cable lateral raise': workoutGif('cableLateralRaiseGif'),
   'close-grip bench press': workoutGif('closeGripBenchPressGif'),
   'lat pulldown': workoutGif('latPulldownGif'),
-  'weighted pull-up': workoutGif('latPulldownGif'),
+  'weighted pull-up': 'https://fitnessprogramer.com/wp-content/uploads/2021/04/Weighted-Pull-up.gif',
   'chest-supported row': workoutGif('dumbbellRowGif'),
+  'chest supported dumbbell row': 'https://i.pinimg.com/originals/d9/67/73/d96773f8c201820aa58bd5250a99dc46.gif',
   'seated cable row': workoutGif('seatedCableRowGif'),
   'face pull': workoutGif('facePullGif'),
   'dumbbell curl': workoutGif('dumbbellCurlGif'),
   'trap-bar deadlift': workoutGif('trapBarDeadliftGif'),
   'barbell row': workoutGif('dumbbellRowGif'),
+  'incline barbell row': 'https://fitnessprogramer.com/wp-content/uploads/2021/06/Incline-Barbell-Row.gif',
   't-bar row': workoutGif('tBarRowGif'),
   'ez-bar curl': workoutGif('dumbbellCurlGif'),
+  'reverse grip ez-bar curl': 'https://fitnessprogramer.com/wp-content/uploads/2021/08/Reverse-Grip-EZ-Bar-Curl.gif',
   'conventional deadlift': workoutGif('trapBarDeadliftGif'),
   'rear-delt cable face pull': workoutGif('facePullGif'),
   'incline dumbbell curl': workoutGif('dumbbellCurlGif'),
+  'seated incline dumbbell curl': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Seated-Incline-Dumbbell-Curl.gif',
   'goblet squat': workoutGif('dumbbellRomanianDeadliftGif'),
-  'leg press': workoutGif('barbellRomanianDeadliftGif'),
+  'dumbbell goblet squat': 'https://fitnessprogramer.com/wp-content/uploads/2023/01/Dumbbell-Goblet-Squat.gif',
+  'leg press': 'https://fitnessprogramer.com/wp-content/uploads/2015/11/Leg-Press.gif',
   'dumbbell romanian deadlift': workoutGif('dumbbellRomanianDeadliftGif'),
   'seated leg curl': workoutGif('seatedLegCurl08Gif'),
   'standing calf raise': workoutGif('standingCalfRaiseGif'),
   'back squat': workoutGif('barbellRomanianDeadliftGif'),
+  'barbell squat': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/BARBELL-SQUAT.gif',
   'back squat high-bar': workoutGif('barbellRomanianDeadliftGif'),
   'romanian deadlift': workoutGif('barbellRomanianDeadliftGif'),
-  'hack squat machine': workoutGif('barbellRomanianDeadliftGif'),
+  'hack squat machine': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Sled-Hack-Squat.gif',
   'leg curl': workoutGif('legCurlGif'),
 };
 
@@ -998,6 +1042,7 @@ const MuscleGainTracker: React.FC = () => {
   const [strengthStats, setStrengthStats] = useState<Record<string, string>>({});
   const [activeSplit, setActiveSplit] = useState<SplitKey>('push');
   const [difficulty, setDifficulty] = useState<DifficultyKey>('intermediate');
+  const [weeklyPlanVariantIndex, setWeeklyPlanVariantIndex] = useState(0);
   const [ageInput, setAgeInput] = useState<string>(() => {
     const inferredAge = inferInitialAge();
     return inferredAge !== null ? String(inferredAge) : '';
@@ -1007,8 +1052,22 @@ const MuscleGainTracker: React.FC = () => {
   const age = Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : null;
   const ageBand = getAgeBand(age);
   const ageGuidance = ageGuidanceByBand[ageBand];
-  const selectedWeeklyPlan = weeklySplitPlans[difficulty];
+  const selectedWeeklyPlanGroup = weeklySplitPlans[difficulty];
+  const weeklyPlanOptions = [
+    {
+      title: selectedWeeklyPlanGroup.title,
+      subtitle: selectedWeeklyPlanGroup.subtitle,
+      days: selectedWeeklyPlanGroup.days,
+    },
+    ...(selectedWeeklyPlanGroup.variants ?? []),
+  ];
+  const selectedWeeklyPlan =
+    weeklyPlanOptions[Math.min(weeklyPlanVariantIndex, weeklyPlanOptions.length - 1)] || weeklyPlanOptions[0];
   const selectedSplitFieldConfig = splitFieldConfigByDifficulty[difficulty][activeSplit];
+
+  useEffect(() => {
+    setWeeklyPlanVariantIndex(0);
+  }, [difficulty]);
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
@@ -1419,6 +1478,23 @@ const MuscleGainTracker: React.FC = () => {
                 <IonIcon icon={calendarOutline} />
                 <span>Weekly Split Plan</span>
               </div>
+              {weeklyPlanOptions.length > 1 && (
+                <div className="split-segment-wrap">
+                  <IonSegment
+                    value={String(weeklyPlanVariantIndex)}
+                    onIonChange={e => {
+                      const nextIndex = Number.parseInt(String(e.detail.value ?? '0'), 10);
+                      setWeeklyPlanVariantIndex(Number.isFinite(nextIndex) ? nextIndex : 0);
+                    }}
+                  >
+                    {weeklyPlanOptions.map((plan, index) => (
+                      <IonSegmentButton key={plan.title} value={String(index)}>
+                        <IonLabel>{index === 0 ? 'Main Plan' : `Variant ${index}`}</IonLabel>
+                      </IonSegmentButton>
+                    ))}
+                  </IonSegment>
+                </div>
+              )}
               <p className="weekly-plan-subtitle">{selectedWeeklyPlan.title}: {selectedWeeklyPlan.subtitle}</p>
               <div className="week-grid">
                 {selectedWeeklyPlan.days.map(item => (
